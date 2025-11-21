@@ -11,7 +11,6 @@ private String timestamp;
 
 public ActivityLog() {}
 
-
 public ActivityLog(Long id, Long userId, String action, String timestamp) {
 this.id = id;
 this.userId = userId;
