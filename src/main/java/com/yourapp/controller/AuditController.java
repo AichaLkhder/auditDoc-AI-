@@ -10,14 +10,15 @@ import javafx.scene.layout.VBox;
  */
 public class AuditController {
 
-    @FXML
-    private VBox dropzone; // Used to handle drag & drop events (not implemented here)
-
+    // Used to handle drag & drop events (not implemented here)
     @FXML
     private ComboBox<String> projetDropdown;
 
     @FXML
     private ComboBox<String> partenaireDropdown;
+
+    @FXML
+    private VBox dropzone;
 
     @FXML
     public void initialize() {
@@ -28,7 +29,8 @@ public class AuditController {
         projetDropdown.getItems().addAll("Projet A", "Projet B", "Projet C");
         partenaireDropdown.getItems().addAll("Partenaire X", "Partenaire Y", "Partenaire Z");
 
-        // Example: Add drag and drop handlers to the dropzone (requires more detailed implementation)
+        // Example: Add drag and drop handlers to the dropzone
+        // (requires more detailed implementation)
         // dropzone.setOnDragOver(...)
     }
 

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.fxml.FXMLLoader?>
+<?import javafx.scene.control.ScrollPane?>
+
+<BorderPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity"
+            prefHeight="900.0" prefWidth="1200.0" stylesheets="@../css/styles.css"
+            xmlns="http://javafx.com/javafx/17.0.12"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.yourapp.controller.MainLayoutController">
+
+    <left>
+        <fx:include fx:id="navbar" source="Navbar.fxml"/>
+    </left>
+
+    <center>
+        <VBox styleClass="main-content" BorderPane.alignment="CENTER">
+
+            <fx:include source="Topbar.fxml"/>
+
+            <ScrollPane fx:id="pageScrollPane" fitToWidth="true" styleClass="page-scroll-pane" VBox.vgrow="ALWAYS">
+                <content>
+                    <VBox fx:id="pageContainer" styleClass="page-container">
+                    </VBox>
+                </content>
+            </ScrollPane>
+
+        </VBox>
+    </center>
+
+</BorderPane>
