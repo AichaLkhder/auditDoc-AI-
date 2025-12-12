@@ -2,57 +2,82 @@ package com.yourapp.controller;
 
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
-import javafx.scene.Node;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.StackPane;
+import javafx.scene.Parent;
 
 import java.io.IOException;
 
-/**
- * Contrôleur principal du MainLayout.fxml.
- * Gère le chargement dynamique des pages dans le conteneur central (pageContainer).
- */
 public class MainLayoutController {
 
-    @FXML private VBox pageContainer;
+    @FXML
+    private StackPane contentArea;
 
-    // Injection du contrôleur de la Navbar via fx:include
-    @FXML private NavbarController navbarController;
+    @FXML
+    private SidebarController sidebarController;
 
     @FXML
     public void initialize() {
-        // Le contrôleur de la Navbar a besoin de connaître le contrôleur principal
-        // pour demander le chargement d'une nouvelle page
-        if (navbarController != null) {
-            navbarController.setMainController(this);
+        System.out.println("MainController initialized - contentArea: " + (contentArea != null));
+
+        // Link sidebar controller to main controller
+        if (sidebarController != null) {
+            sidebarController.setMainController(this);
         }
 
-        // Charger la page 'Audit' par défaut au démarrage
-        loadPage("AuditView.fxml");
+        // Load default view (Dashboard)
+        loadView("Dashboard.fxml");
     }
 
-    /**
-     * Charge un nouveau fichier FXML dans le conteneur de page central.
-     * @param fxmlFileName Le nom du fichier FXML à charger (ex: "AuditView.fxml").
-     */
-    public void loadPage(String fxmlFileName) {
+    public void loadView(String fxmlFile) {
         try {
-            FXMLLoader loader = new FXMLLoader(
-                    getClass().getResource("/views/fxml/" + fxmlFileName)
-            );
-            Node pageNode = loader.load();
+            // Clear current content
+            contentArea.getChildren().clear();
 
-            // S'assurer que le contenu est bien chargé dans le conteneur
-            pageContainer.getChildren().setAll(pageNode);
+            // Load new FXML - adjust path based on your project structure
+            String fxmlPath = "/views/fxml/" + fxmlFile;
 
-            // Optionnel: Réinitialiser le ScrollPane au début de la page
-            // pageScrollPane.setVvalue(0.0);
+            System.out.println("Attempting to load: " + fxmlPath);
 
-            System.out.println("Page chargée : " + fxmlFileName);
+            FXMLLoader loader = new FXMLLoader();
+            loader.setLocation(getClass().getResource(fxmlPath));
+
+            if (loader.getLocation() == null) {
+                throw new IOException("FXML file not found: " + fxmlPath);
+            }
+
+            Parent view = loader.load();
+
+            // Add to content area
+            contentArea.getChildren().add(view);
+
+            System.out.println("Successfully loaded view: " + fxmlFile);
 
         } catch (IOException e) {
-            System.err.println("Erreur de chargement de la page FXML : " + fxmlFileName);
+            System.err.println("Error loading view: " + fxmlFile);
             e.printStackTrace();
-            // Optionnel: Afficher un message d'erreur dans le conteneur
+
+            // Show error message in content area
+            showErrorView("Impossible de charger la page: " + fxmlFile + "\nChemin: /views/fxml/" + fxmlFile);
+        } catch (Exception e) {
+            System.err.println("Unexpected error loading view: " + fxmlFile);
+            e.printStackTrace();
+            showErrorView("Erreur inattendue: " + e.getMessage());
+        }
+    }
+
+    private void showErrorView(String errorMessage) {
+        try {
+            contentArea.getChildren().clear();
+
+            // Create a simple error label
+            javafx.scene.control.Label errorLabel = new javafx.scene.control.Label(errorMessage);
+            errorLabel.setStyle("-fx-text-fill: red; -fx-font-size: 16px;");
+
+            contentArea.getChildren().add(errorLabel);
+
+        } catch (Exception e) {
+            System.err.println("Error showing error view");
+            e.printStackTrace();
         }
     }
 }

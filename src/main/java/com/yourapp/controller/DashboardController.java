@@ -56,3 +56,4 @@ public class DashboardController {
         // TODO: Navigate to reports
     }
 }
+
