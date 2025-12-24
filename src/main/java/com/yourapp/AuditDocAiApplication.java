@@ -1,4 +1,4 @@
-package com.yourapp;
+/*package com.yourapp;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -8,11 +8,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/**
- * Application Spring Boot REST API
- * Cette application expose les API REST sur le port 8080
- * Elle tourne SÉPARÉMENT de l'application JavaFX
- */
+
 @SpringBootApplication
 @EnableJpaRepositories("com.yourapp.DAO")
 @EntityScan("com.yourapp.model")
@@ -31,9 +27,7 @@ public class AuditDocAiApplication {
         System.out.println("========================================");
     }
 
-    /**
-     * Configuration CORS pour permettre les requêtes depuis JavaFX
-     */
+
     @Bean
     public WebMvcConfigurer corsConfigurer() {
         return new WebMvcConfigurer() {
@@ -49,3 +43,4 @@ public class AuditDocAiApplication {
         };
     }
 }
+*/

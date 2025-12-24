@@ -4,203 +4,348 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 
+import java.net.SocketTimeoutException;
+import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-/**
- * Client pour communiquer avec l'API d'intelligence artificielle
- * Avec fallback automatique en mode simulation si quota dépassé
- */
 @Component
 @Slf4j
 public class AiClient {
 
-    @Value("${ai.api.url:https://api.openai.com/v1/chat/completions}")
+    @Value("${ai.provider:ollama}")
+    private String provider;
+
+    @Value("${ai.ollama.base-url:http://localhost:11434}")
+    private String ollamaBaseUrl;
+
+    @Value("${ai.ollama.api-path:/api/generate}")
+    private String ollamaApiPath;
+
+    @Value("${ai.api.url:}")
     private String apiUrl;
 
     @Value("${ai.api.key:}")
     private String apiKey;
 
-    @Value("${ai.model:gpt-3.5-turbo}")
+    @Value("${ai.model:llama3}")
     private String model;
 
-    @Value("${ai.max.tokens:2000}")
+    @Value("${ai.max-tokens:2000}")
     private Integer maxTokens;
 
     @Value("${ai.temperature:0.7}")
     private Double temperature;
 
     @Value("${ai.simulation.mode:auto}")
-    private String simulationMode; // auto, enabled, disabled
+    private String simulationMode;
+
+    @Value("${ai.ollama.timeout:300000}")
+    private int timeoutMs;
+
+    @Value("${ai.retry.max-attempts:3}")
+    private int maxRetryAttempts;
+
+    @Value("${ai.retry.backoff-delay:1000}")
+    private int retryBackoffDelay;
 
     private final RestTemplate restTemplate;
-    private boolean quotaExceeded = false;
+    private boolean forceSimulation = false;
 
     public AiClient() {
-        this.restTemplate = new RestTemplate();
+        // Configuration du RestTemplate avec timeout personnalisé
+        this.restTemplate = createRestTemplateWithTimeout();
     }
 
     /**
-     * Envoyer une requête à l'API IA et récupérer la réponse
+     * Crée un RestTemplate avec des timeouts configurés
+     */
+    private RestTemplate createRestTemplateWithTimeout() {
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory =
+                new org.springframework.http.client.SimpleClientHttpRequestFactory();
+
+        factory.setConnectTimeout(Duration.ofMillis(timeoutMs));
+        factory.setReadTimeout(Duration.ofMillis(timeoutMs));
+
+        return new RestTemplate(factory);
+    }
+
+    /**
+     * Point d'entrée principal pour envoyer une requête à l'IA
      */
     public String sendRequest(String prompt) {
-        log.info("📤 Envoi d'une requête à l'API IA");
-        log.debug("Prompt: {}", prompt.substring(0, Math.min(200, prompt.length())) + "...");
+        log.info("📤 Envoi requête IA | provider={} | model={}", provider, model);
 
-        // Si le mode simulation est activé ou si le quota est dépassé
-        if ("enabled".equalsIgnoreCase(simulationMode) ||
-                ("auto".equalsIgnoreCase(simulationMode) && shouldUseSimulation())) {
-            log.info("🎭 Mode simulation actif");
+        if (shouldSimulate()) {
+            log.info("🎭 Mode simulation activé");
             return simulateAiResponse(prompt);
         }
+
+        // Tentatives avec retry
+        for (int attempt = 1; attempt <= maxRetryAttempts; attempt++) {
+            try {
+                String result = switch (provider.toLowerCase()) {
+                    case "openai" -> callOpenAi(prompt);
+                    case "ollama" -> callOllama(prompt);
+                    case "gemini" -> callGemini(prompt);
+                    default -> throw new IllegalStateException("Provider IA inconnu: " + provider);
+                };
+
+                if (result != null && !result.trim().isEmpty()) {
+                    log.info("✅ Réponse IA reçue avec succès (tentative {}/{})", attempt, maxRetryAttempts);
+                    return result;
+                }
+
+            } catch (ResourceAccessException e) {
+                if (e.getCause() instanceof SocketTimeoutException) {
+                    log.warn("⏱️ Timeout lors de la tentative {} sur {}", attempt, maxRetryAttempts);
+                    if (attempt < maxRetryAttempts) {
+                        sleepWithBackoff(attempt);
+                        continue;
+                    }
+                }
+                throw new RuntimeException("Erreur de connexion à l'API IA: " + e.getMessage(), e);
+            } catch (HttpClientErrorException | HttpServerErrorException e) {
+                log.error("❌ Erreur HTTP {} lors de la tentative {}: {}",
+                        e.getStatusCode(), attempt, e.getMessage());
+                if (attempt < maxRetryAttempts) {
+                    sleepWithBackoff(attempt);
+                    continue;
+                }
+                throw new RuntimeException("Erreur API IA: " + e.getStatusCode() + " - " + e.getMessage(), e);
+            } catch (Exception e) {
+                log.error("❌ Erreur inattendue lors de la tentative {}: {}", attempt, e.getMessage());
+                if (attempt < maxRetryAttempts) {
+                    sleepWithBackoff(attempt);
+                    continue;
+                }
+
+                // En mode auto, basculer en simulation après tous les retry échoués
+                if ("auto".equalsIgnoreCase(simulationMode)) {
+                    log.warn("🔄 Basculement automatique en mode SIMULATION après {} échecs.", maxRetryAttempts);
+                    forceSimulation = true;
+                    return simulateAiResponse(prompt);
+                }
+                throw new RuntimeException("Erreur lors de l'appel à l'API IA: " + e.getMessage(), e);
+            }
+        }
+
+        throw new RuntimeException("Toutes les tentatives ont échoué");
+    }
+
+    /**
+     * Délai exponentiel avec backoff pour les retry
+     */
+    private void sleepWithBackoff(int attempt) {
+        try {
+            long delay = retryBackoffDelay * (long) Math.pow(2, attempt - 1);
+            log.info("⏳ Attente de {} ms avant la tentative suivante", delay);
+            Thread.sleep(Math.min(delay, 10000)); // Max 10 secondes
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interruption pendant le backoff", e);
+        }
+    }
+
+    // =============================
+    // GOOGLE GEMINI (AI Studio)
+    // =============================
+    private String callGemini(String prompt) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("Clé API Gemini manquante dans la configuration.");
+        }
+
+        // L'API Google requiert la clé en paramètre d'URL
+        String urlWithKey = apiUrl + "?key=" + apiKey;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        // Construction du corps spécifique à Gemini (v1 / v1beta)
+        Map<String, Object> body = new HashMap<>();
+
+        // Structure : contents -> parts -> text
+        Map<String, Object> textPart = new HashMap<>();
+        textPart.put("text", prompt);
+
+        Map<String, Object> content = new HashMap<>();
+        content.put("parts", List.of(textPart));
+
+        body.put("contents", List.of(content));
+
+        // Configuration optionnelle
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("temperature", temperature);
+        generationConfig.put("maxOutputTokens", maxTokens);
+        body.put("generationConfig", generationConfig);
+
+        return extractGeminiResponse(send(urlWithKey, body, headers));
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractGeminiResponse(Map<String, Object> response) {
+        try {
+            List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.get("candidates");
+            if (candidates == null || candidates.isEmpty()) {
+                throw new RuntimeException("Aucun candidat trouvé dans la réponse Gemini.");
+            }
+
+            Map<String, Object> firstCandidate = candidates.get(0);
+            Map<String, Object> content = (Map<String, Object>) firstCandidate.get("content");
+            List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
+
+            return (String) parts.get(0).get("text");
+        } catch (Exception e) {
+            log.error("❌ Erreur lors de l'extraction de la réponse Gemini. Structure reçue: {}", response);
+            throw new RuntimeException("Format de réponse Gemini invalide", e);
+        }
+    }
+
+    // =============================
+    // OPENAI
+    // =============================
+    private String callOpenAi(String prompt) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("Clé API OpenAI manquante dans la configuration.");
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", model);
+        body.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+        body.put("max_tokens", maxTokens);
+        body.put("temperature", temperature);
+
+        return extractOpenAiResponse(send(apiUrl, body, headers));
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractOpenAiResponse(Map<String, Object> response) {
+        try {
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+            if (choices == null || choices.isEmpty()) {
+                throw new RuntimeException("Aucun choix dans la réponse OpenAI");
+            }
+
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            if (message == null) {
+                throw new RuntimeException("Format de réponse OpenAI invalide: message manquant");
+            }
+
+            return (String) message.get("content");
+        } catch (Exception e) {
+            log.error("❌ Erreur lors de l'extraction de la réponse OpenAI. Structure reçue: {}", response);
+            throw new RuntimeException("Format de réponse OpenAI invalide", e);
+        }
+    }
+
+    // =============================
+    // OLLAMA (Local)
+    // =============================
+    private String callOllama(String prompt) {
+        String fullUrl = ollamaBaseUrl + ollamaApiPath;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", model);
+        body.put("prompt", prompt);
+        body.put("stream", false);
+        body.put("options", Map.of(
+                "temperature", temperature,
+                "num_predict", maxTokens
+        ));
+
+        log.debug("🌐 Appel Ollama à: {}", fullUrl);
+        log.debug("📝 Prompt: {}", prompt.substring(0, Math.min(200, prompt.length())) + "...");
 
         try {
-            // Vérifier que la clé API est configurée
-            if (apiKey == null || apiKey.isEmpty()) {
-                log.warn("⚠️ Clé API non configurée, passage en mode simulation");
-                quotaExceeded = true;
-                return simulateAiResponse(prompt);
-            }
-
-            // Construire la requête
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
-
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("model", model);
-            requestBody.put("messages", new Object[]{
-                    Map.of("role", "user", "content", prompt)
-            });
-            requestBody.put("max_tokens", maxTokens);
-            requestBody.put("temperature", temperature);
-
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
-            // Envoyer la requête
-            ResponseEntity<Map> response = restTemplate.exchange(
-                    apiUrl,
-                    HttpMethod.POST,
-                    entity,
-                    Map.class
-            );
-
-            // Extraire la réponse
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                Map<String, Object> responseBody = response.getBody();
-                Object choices = responseBody.get("choices");
-
-                if (choices instanceof java.util.List && !((java.util.List) choices).isEmpty()) {
-                    Map<String, Object> firstChoice = (Map<String, Object>) ((java.util.List) choices).get(0);
-                    Map<String, Object> message = (Map<String, Object>) firstChoice.get("message");
-                    String content = (String) message.get("content");
-
-                    log.info("✅ Réponse IA reçue avec succès");
-                    log.debug("Réponse: {}", content.substring(0, Math.min(200, content.length())) + "...");
-
-                    return content;
-                }
-            }
-
-            throw new RuntimeException("Réponse invalide de l'API IA");
-
-        } catch (HttpClientErrorException.TooManyRequests e) {
-            log.error("⚠️ Quota API dépassé (429), passage en mode simulation", e);
-            quotaExceeded = true;
-            return simulateAiResponse(prompt);
-
-        } catch (HttpClientErrorException.Unauthorized e) {
-            log.error("⚠️ Clé API invalide (401), passage en mode simulation", e);
-            quotaExceeded = true;
-            return simulateAiResponse(prompt);
-
-        } catch (Exception e) {
-            log.error("❌ Erreur lors de la communication avec l'API IA", e);
-
-            // En mode auto, basculer en simulation en cas d'erreur
-            if ("auto".equalsIgnoreCase(simulationMode)) {
-                log.warn("🎭 Passage en mode simulation suite à l'erreur");
-                quotaExceeded = true;
-                return simulateAiResponse(prompt);
-            }
-
-            throw new RuntimeException("Erreur lors de la communication avec l'API IA: " + e.getMessage(), e);
+            return extractOllamaResponse(send(fullUrl, body, headers));
+        } catch (ResourceAccessException e) {
+            log.error("🔌 Impossible de se connecter à Ollama. Vérifiez que le service est démarré à {}", ollamaBaseUrl);
+            throw new RuntimeException("Ollama n'est pas démarré ou inaccessible", e);
         }
     }
 
-    /**
-     * Déterminer si le mode simulation doit être utilisé
-     */
-    private boolean shouldUseSimulation() {
-        return quotaExceeded || apiKey == null || apiKey.isEmpty();
+    @SuppressWarnings("unchecked")
+    private String extractOllamaResponse(Map<String, Object> response) {
+        try {
+            String responseText = (String) response.get("response");
+            if (responseText == null || responseText.trim().isEmpty()) {
+                throw new RuntimeException("Réponse Ollama vide");
+            }
+
+            log.debug("📨 Réponse Ollama reçue: {} caractères", responseText.length());
+            return responseText;
+        } catch (Exception e) {
+            log.error("❌ Erreur lors de l'extraction de la réponse Ollama. Structure reçue: {}", response);
+            throw new RuntimeException("Format de réponse Ollama invalide", e);
+        }
     }
 
-    /**
-     * Simuler une réponse de l'IA pour les tests ou en cas d'erreur
-     */
+    // =============================
+    // COMMUNICATION HTTP
+    // =============================
+    private Map<String, Object> send(String url, Map<String, Object> body, HttpHeaders headers) {
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+        log.debug("🌐 Envoi HTTP POST à: {}", url);
+
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("Réponse API invalide, code HTTP : " + response.getStatusCode());
+        }
+
+        if (response.getBody() == null) {
+            throw new RuntimeException("Réponse API vide");
+        }
+
+        return response.getBody();
+    }
+
+    // =============================
+    // MODE SIMULATION / STATUS
+    // =============================
+    private boolean shouldSimulate() {
+        return "enabled".equalsIgnoreCase(simulationMode) || forceSimulation;
+    }
+
     private String simulateAiResponse(String prompt) {
-        log.info("🎭 Mode simulation - génération d'une réponse de test");
+        log.warn("🎭 MODE SIMULATION : Génération d'une réponse de test");
 
-        // Analyser le prompt pour générer une réponse plus pertinente
-        boolean isArabic = prompt.contains("مراسلة") || prompt.contains("الجمعية");
-
-        // Réponse simulée au format JSON structuré
-        if (isArabic) {
-            return """
-            {
-              "issues": [
-                {
-                  "issueType": "مشكلة التنسيق",
-                  "description": "يحتوي المستند على تناقضات في التنسيق في عدة أقسام",
-                  "pageNumber": 1,
-                  "paragraphNumber": 2,
-                  "suggestion": "توحيد التنسيق باستخدام الأنماط المحددة في النموذج"
-                },
-                {
-                  "issueType": "معلومات مفقودة",
-                  "description": "بعض المعلومات المطلوبة غير موجودة في المستند",
-                  "pageNumber": 2,
-                  "paragraphNumber": 1,
-                  "suggestion": "إضافة جميع المراجع الببليوغرافية المطلوبة وفقًا للمعايير"
-                },
-                {
-                  "issueType": "عدم المطابقة للمعايير",
-                  "description": "لا يتبع تنظيم الوثيقة البنية الموصى بها",
-                  "pageNumber": null,
-                  "paragraphNumber": null,
-                  "suggestion": "إعادة تنظيم الأقسام حسب الترتيب القياسي: المقدمة، المنهجية، النتائج، الخاتمة"
-                }
-              ]
-            }
-            """;
+        // Simuler un délai d'analyse
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
 
         return """
         {
           "issues": [
             {
-              "issueType": "Problème de formatage",
-              "description": "Le document présente des incohérences de formatage dans plusieurs sections",
+              "issueType": "Conformité",
+              "description": "Document analysé en mode simulation. Ceci est une réponse de test pour vérifier le fonctionnement du système.",
+              "pageNumber": 1,
+              "paragraphNumber": 1,
+              "suggestion": "Pour une analyse réelle, vérifiez la connexion à l'API IA et désactivez le mode simulation."
+            },
+            {
+              "issueType": "Structure",
+              "description": "Format du document non vérifié en mode simulation.",
               "pageNumber": 1,
               "paragraphNumber": 2,
-              "suggestion": "Uniformiser le formatage en utilisant les styles définis dans le modèle"
-            },
-            {
-              "issueType": "Informations manquantes",
-              "description": "Certaines informations requises sont absentes du document",
-              "pageNumber": 3,
-              "paragraphNumber": 1,
-              "suggestion": "Ajouter toutes les références bibliographiques requises selon les normes"
-            },
-            {
-              "issueType": "Non-conformité structurelle",
-              "description": "L'organisation du document ne suit pas la structure recommandée",
-              "pageNumber": null,
-              "paragraphNumber": null,
-              "suggestion": "Réorganiser les sections selon l'ordre standard: Introduction, Méthodologie, Résultats, Conclusion"
+              "suggestion": "Assurez-vous que le document respecte les normes requises."
             }
           ]
         }
@@ -208,44 +353,44 @@ public class AiClient {
     }
 
     /**
-     * Tester la connexion avec l'API IA
+     * Test de connexion à l'API IA
      */
     public boolean testConnection() {
         try {
-            String testResponse = sendRequest("Test de connexion. Réponds 'OK'.");
-            return testResponse != null && !testResponse.isEmpty();
+            String testPrompt = "Test de connexion. Réponds simplement par 'OK'.";
+            String response = sendRequest(testPrompt);
+            return response != null && response.contains("OK");
         } catch (Exception e) {
-            log.error("❌ Échec du test de connexion avec l'API IA", e);
+            log.error("❌ Test de connexion IA échoué: {}", e.getMessage());
             return false;
         }
     }
 
     /**
-     * Réinitialiser le flag de quota dépassé
+     * Obtenir le statut de l'API IA
      */
-    public void resetQuotaFlag() {
-        quotaExceeded = false;
-        log.info("🔄 Flag quota réinitialisé");
-    }
+    public Map<String, Object> getStatus() {
+        Map<String, Object> status = new HashMap<>();
+        status.put("provider", provider);
+        status.put("model", model);
+        status.put("simulationMode", simulationMode);
+        status.put("forceSimulation", forceSimulation);
 
-    /**
-     * Vérifier si le mode simulation est actif
-     */
-    public boolean isSimulationMode() {
-        return "enabled".equalsIgnoreCase(simulationMode) ||
-                ("auto".equalsIgnoreCase(simulationMode) && quotaExceeded);
-    }
-
-    /**
-     * Obtenir le statut de l'API
-     */
-    public String getApiStatus() {
-        if (isSimulationMode()) {
-            return "MODE_SIMULATION";
-        } else if (apiKey == null || apiKey.isEmpty()) {
-            return "NO_API_KEY";
-        } else {
-            return "ACTIVE";
+        try {
+            status.put("connected", testConnection());
+        } catch (Exception e) {
+            status.put("connected", false);
+            status.put("error", e.getMessage());
         }
+
+        return status;
+    }
+
+    /**
+     * Réinitialiser le mode simulation
+     */
+    public void resetSimulation() {
+        forceSimulation = false;
+        log.info("🔄 Mode simulation réinitialisé");
     }
 }

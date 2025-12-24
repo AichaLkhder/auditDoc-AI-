@@ -1,46 +1,122 @@
-api:
-  base:
-    url: http://localhost:8080
-  ai:
-    api:
-      url: https://api.openai.com/v1/chat/completions
-      key: ${OPENAI_API_KEY}
-    model: gpt-3.5-turbo
-    max:
-      tokens: 2000
-    temperature: 0.7
-    simulation:
-      mode: auto
-
-
-
+# ========================================
+# 🚀 SPRING BOOT CONFIGURATION
+# ========================================
 
 spring:
+  main:
+    web-application-type: NONE
+    banner-mode: console
+    lazy-initialization: false
+
+  # ================================
+  # 📊 DATABASE CONFIGURATION
+  # ================================
   datasource:
     url: jdbc:postgresql://aws-1-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true
-    username: ${USERNAME}
-    password: ${PASSWORD}
+    username: postgres.ziyevqgoffoejasscxyg
+    password: WcDmGFscwNTZL6pY
 
     hikari:
-      maximum-pool-size: 5
-      minimum-idle: 1
-      idle-timeout: 10000
-      max-lifetime: 30000
-      connection-test-query: SELECT 1
+      auto-commit: false  # CRITICAL FIX
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      max-lifetime: 120000
+      connection-timeout: 30000
       validation-timeout: 5000
-
+      leak-detection-threshold: 60000
+      connection-test-query: SELECT 1
       data-source-properties:
+        socketTimeout: 30000
+        connectTimeout: 10000
+        tcpKeepAlive: true
         prepareThreshold: 0
 
+  # ================================
+  # 🗄️ JPA/HIBERNATE CONFIGURATION
+  # ================================
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate  # CHANGED from 'update' to 'validate'
     show-sql: true
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 20
+          fetch_size: 50
+        connection:
+          provider_disables_autocommit: true
+        transaction:
+          jta:
+            platform: org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform
+
+  # ================================
+  # 📁 FILE UPLOAD CONFIGURATION
+  # ================================
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
 
   sql:
     init:
       mode: never
+
+# ========================================
+# 🤖 AI CONFIGURATION
+# ========================================
+
+ai:
+  ollama:
+    base-url: http://localhost:11434
+    model: llama3
+    timeout: 300000
+
+  provider: ollama
+  max-tokens: 2000
+  temperature: 0.7
+
+# ========================================
+# 📝 LOGGING CONFIGURATION
+# ========================================
+
+logging:
+  level:
+    com.yourapp: INFO
+    org.springframework: INFO
+    org.hibernate.SQL: WARN  # CHANGED from DEBUG to WARN
+    org.hibernate.type: WARN
+    com.zaxxer.hikari: INFO  # CHANGED from DEBUG to INFO
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+  file:
+    name: logs/auditdoc-ai.log
+
+# ========================================
+# ⚙️ APPLICATION CONFIGURATION
+# ========================================
+
+app:
+  name: AuditDoc AI
+  version: 1.0.0
+
+  upload:
+    max-files: 10
+    allowed-extensions: .pdf,.doc,.docx,.xls,.xlsx
+    temp-dir: temp/uploads/
+
+  audit:
+    max-concurrent-audits: 3
+    timeout-minutes: 5
+
+# ========================================
+# 🔧 SERVER CONFIGURATION (optional)
+# ========================================
+
+server:
+  port: 8080
+  shutdown: graceful
