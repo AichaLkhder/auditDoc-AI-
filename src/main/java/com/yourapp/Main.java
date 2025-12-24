@@ -1,6 +1,5 @@
 package com.yourapp;
 
-import com.yourapp.controller.MainLayoutController;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -17,14 +16,14 @@ public class Main extends Application {
     @Override
     public void init() {
         SpringApplication app = new SpringApplication(AuditDocAiApplication.class);
-        app.setWebApplicationType(org.springframework.boot.WebApplicationType.NONE); // désactive Tomcat
+        app.setWebApplicationType(org.springframework.boot.WebApplicationType.NONE);
         springContext = app.run();
     }
 
     @Override
     public void start(Stage stage) throws Exception {
         FXMLLoader loader = new FXMLLoader(
-                Main.class.getResource("/views/fxml/MainLayout.fxml")
+                Main.class.getResource("/views/fxml/signup.fxml")
         );
         loader.setControllerFactory(param ->
                 springContext.getBean(param)
@@ -32,16 +31,15 @@ public class Main extends Application {
 
         Parent root = loader.load();
 
-        MainLayoutController mainController = loader.getController();
-        mainController.setSpringContext(springContext);
-        mainController.loadView("Dashboard.fxml");
         stage.setScene(new Scene(root, 800, 600));
-        stage.setTitle("AuditDoc AI");
+        stage.setTitle("AuditDoc AI - Connexion");
         stage.show();
     }
 
     @Override
-    public void stop() {
-        springContext.close();
+    public void stop() {springContext.close();}
+
+    public static ConfigurableApplicationContext getSpringContext() {
+        return springContext;
     }
 }
