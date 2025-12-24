@@ -4,6 +4,7 @@ import com.yourapp.dto.AuditCreateRequestDto;
 import com.yourapp.dto.AuditDocumentDto;
 import com.yourapp.dto.AuditResponseDto;
 import com.yourapp.dto.AuditTemplateDTO;
+import com.yourapp.dto.AuditIssueDto;
 import com.yourapp.model.Project;
 import com.yourapp.services_UI.AuditApiService;
 import com.yourapp.services_UI.FileUploadService;
@@ -25,7 +26,7 @@ import javafx.util.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
+import com.yourapp.services_UI.ReportService;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +57,7 @@ public class AuditController {
     @Autowired private ModelService modelService;
     @Autowired private AuditApiService auditApiService;
     @Autowired private FileUploadService fileUploadService;
+    @Autowired private ReportService reportService;
 
     // ============ Variables d'état ============
     private VBox notificationBox;
@@ -102,13 +104,12 @@ public class AuditController {
                 log.info("📌 Projet sélectionné: {}", selectedProject.getName());
                 loadModelsForProject(selectedProject.getId());
             } else {
-                // Réinitialiser les modèles si aucun projet sélectionné
                 partenaireDropdown.getItems().clear();
                 selectedModel = null;
             }
         });
 
-        // Configurer le modèle dropdown (utilise AuditTemplateDTO)
+        // Configurer le modèle dropdown
         partenaireDropdown.setConverter(new javafx.util.StringConverter<AuditTemplateDTO>() {
             @Override
             public String toString(AuditTemplateDTO template) {
@@ -193,7 +194,7 @@ public class AuditController {
             Platform.runLater(() -> {
                 partenaireDropdown.getItems().clear();
                 partenaireDropdown.getItems().addAll(models);
-                partenaireDropdown.setValue(null); // Réinitialiser la sélection
+                partenaireDropdown.setValue(null);
                 selectedModel = null;
 
                 if (models.isEmpty()) {
@@ -234,7 +235,6 @@ public class AuditController {
             return;
         }
 
-        // Valider les fichiers
         List<File> validFiles = fileUploadService.validateFiles(files);
 
         if (validFiles.isEmpty()) {
@@ -243,7 +243,6 @@ public class AuditController {
             return;
         }
 
-        // Ajouter les fichiers à la liste
         filesList.getChildren().clear();
         selectedFiles.clear();
 
@@ -320,7 +319,6 @@ public class AuditController {
     private void handleStartAudit() {
         log.info("🚀 Démarrage de l'audit...");
 
-        // Validations
         if (selectedProject == null) {
             showNotification("⚠️ Projet requis", "Veuillez sélectionner un projet");
             return;
@@ -336,7 +334,6 @@ public class AuditController {
             return;
         }
 
-        // Afficher la boîte de dialogue de progression
         showProgressDialog();
     }
 
@@ -381,12 +378,18 @@ public class AuditController {
         progressDialog.getDialogPane().setContent(dialogContent);
         progressDialog.getDialogPane().lookupButton(closeButtonType).setVisible(false);
 
-        // Créer la tâche d'audit
         Task<AuditResponseDto> auditTask = createAuditTask(statusLabel, percentLabel, progressBar);
 
         auditTask.setOnSucceeded(e -> {
             progressDialog.close();
             AuditResponseDto audit = auditTask.getValue();
+
+            // 🔥 FIX: Récupérer les issues depuis le service
+            log.info("📊 Récupération des issues pour l'audit {}", audit.getId());
+            List<AuditIssueDto> issues = auditApiService.getIssuesByAudit(audit.getId());
+            audit.setIssues(issues);
+
+            log.info("✅ {} issues récupérées pour affichage", issues.size());
             showAuditResultsDialog(audit);
             showSuccessNotification();
         });
@@ -411,8 +414,6 @@ public class AuditController {
             protected AuditResponseDto call() throws Exception {
                 try {
                     // Étape 1: Créer l'audit
-                    updateMessage("Création de l'audit...");
-                    updateProgress(1, 5);
                     Platform.runLater(() -> {
                         statusLabel.setText("Création de l'audit...");
                         percentLabel.setText("20%");
@@ -422,7 +423,7 @@ public class AuditController {
                     AuditCreateRequestDto request = new AuditCreateRequestDto();
                     request.setProjectId(selectedProject.getId());
                     request.setModelId(selectedModel.getId());
-                    request.setDocumentIds(new ArrayList<>()); // Sera rempli après upload
+                    request.setDocumentIds(new ArrayList<>());
 
                     AuditResponseDto audit = auditApiService.createAudit(request);
                     currentAuditId = audit.getId();
@@ -430,8 +431,6 @@ public class AuditController {
                     log.info("✅ Audit créé avec ID: {}", currentAuditId);
 
                     // Étape 2: Upload des documents
-                    updateMessage("Upload des documents...");
-                    updateProgress(2, 5);
                     Platform.runLater(() -> {
                         statusLabel.setText("Upload des documents...");
                         percentLabel.setText("40%");
@@ -445,8 +444,6 @@ public class AuditController {
                     log.info("✅ {} documents uploadés", uploadedDocs.size());
 
                     // Étape 3: Lancer l'analyse
-                    updateMessage("Lancement de l'analyse IA...");
-                    updateProgress(3, 5);
                     Platform.runLater(() -> {
                         statusLabel.setText("Lancement de l'analyse IA...");
                         percentLabel.setText("60%");
@@ -457,22 +454,19 @@ public class AuditController {
 
                     log.info("✅ Analyse lancée");
 
-                    // Étape 4: Polling du statut
-                    updateMessage("Analyse en cours...");
-                    updateProgress(4, 5);
+                    // Étape 4: Polling du statut - OPTIMISÉ avec timeout réduit
                     Platform.runLater(() -> {
                         statusLabel.setText("Analyse en cours...");
                         percentLabel.setText("80%");
                         progressBar.setProgress(0.8);
                     });
 
+                    // Polling avec timeout de 30 secondes max (au lieu de 60)
                     AuditResponseDto finalAudit = auditApiService.pollAuditStatus(
-                            currentAuditId, 60, 2 // 60 tentatives toutes les 2 secondes
+                            currentAuditId, 30, 2
                     );
 
                     // Étape 5: Terminé
-                    updateMessage("Analyse terminée ✅");
-                    updateProgress(5, 5);
                     Platform.runLater(() -> {
                         statusLabel.setText("Analyse terminée ✅");
                         percentLabel.setText("100%");
@@ -487,77 +481,6 @@ public class AuditController {
                 }
             }
         };
-    }
-
-    /**
-     * Afficher la boîte de dialogue des résultats
-     */
-    private void showAuditResultsDialog(AuditResponseDto audit) {
-        Dialog<Void> resultsDialog = new Dialog<>();
-        resultsDialog.setTitle("Analyse terminée");
-        resultsDialog.setHeaderText(null);
-
-        ButtonType closeButton = new ButtonType("Fermer", ButtonBar.ButtonData.CANCEL_CLOSE);
-        resultsDialog.getDialogPane().getButtonTypes().add(closeButton);
-
-        VBox mainContent = new VBox(15);
-        mainContent.setPadding(new Insets(20));
-        mainContent.setPrefWidth(700);
-        mainContent.setPrefHeight(600);
-
-        // Titre
-        Label titleLabel = new Label("Analyse terminée");
-        titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: 600; -fx-text-fill: #1f2937;");
-
-        // Rapport de conformité
-        VBox reportBox = createReportSummaryBox(audit);
-
-        // Liste des problèmes
-        ScrollPane scrollPane = new ScrollPane();
-        scrollPane.setFitToWidth(true);
-        scrollPane.setPrefHeight(400);
-        scrollPane.setStyle("-fx-background-color: white;");
-
-        VBox issuesContainer = new VBox(12);
-        issuesContainer.setPadding(new Insets(10));
-
-        if (audit.getIssues() != null && !audit.getIssues().isEmpty()) {
-            for (var issue : audit.getIssues()) {
-                issuesContainer.getChildren().add(createIssueCard(issue));
-            }
-        } else {
-            Label noIssuesLabel = new Label("✅ Aucun problème détecté");
-            noIssuesLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #10b981;");
-            issuesContainer.getChildren().add(noIssuesLabel);
-        }
-
-        scrollPane.setContent(issuesContainer);
-
-        // Boutons d'action
-        HBox actionButtons = new HBox(12);
-        actionButtons.setAlignment(Pos.CENTER);
-
-        Button newAuditBtn = new Button("Lancer un Nouvel Audit");
-        newAuditBtn.setStyle("""
-            -fx-background-color: #1E88E5;
-            -fx-text-fill: white;
-            -fx-font-weight: 600;
-            -fx-font-size: 13px;
-            -fx-padding: 10 20;
-            -fx-border-radius: 8;
-            -fx-background-radius: 8;
-            -fx-cursor: hand;
-        """);
-        newAuditBtn.setOnAction(e -> {
-            resultsDialog.close();
-            resetAuditForm();
-        });
-
-        actionButtons.getChildren().add(newAuditBtn);
-
-        mainContent.getChildren().addAll(titleLabel, reportBox, scrollPane, actionButtons);
-        resultsDialog.getDialogPane().setContent(mainContent);
-        resultsDialog.show();
     }
 
     /**
@@ -576,7 +499,7 @@ public class AuditController {
         title.setStyle("-fx-font-size: 16px; -fx-font-weight: 600;");
 
         int docsCount = audit.getDocuments() != null ? audit.getDocuments().size() : 0;
-        int issuesCount = audit.getProblemsCount() != null ? audit.getProblemsCount() : 0;
+        int issuesCount = audit.getIssues() != null ? audit.getIssues().size() : 0;
 
         Label subtitle = new Label(String.format(
                 "Analyse terminée pour %d document(s) - %d problème(s) détecté(s)",
@@ -586,43 +509,6 @@ public class AuditController {
 
         box.getChildren().addAll(title, subtitle);
         return box;
-    }
-
-    /**
-     * Créer une carte pour un problème
-     */
-    private VBox createIssueCard(com.yourapp.dto.AuditIssueDto issue) {
-        VBox card = new VBox(10);
-        card.setStyle("""
-            -fx-background-color: white;
-            -fx-border-color: #e5e7eb;
-            -fx-border-width: 1;
-            -fx-border-radius: 12;
-            -fx-background-radius: 12;
-            -fx-padding: 15;
-        """);
-
-        Label typeLabel = new Label(issue.getIssueType());
-        typeLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #dc2626;");
-
-        Label descLabel = new Label(issue.getDescription());
-        descLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #374151; -fx-wrap-text: true;");
-
-        card.getChildren().addAll(typeLabel, descLabel);
-
-        if (issue.getLocation() != null && !issue.getLocation().isEmpty()) {
-            Label locationLabel = new Label("📍 " + issue.getLocation());
-            locationLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #6b7280;");
-            card.getChildren().add(locationLabel);
-        }
-
-        if (issue.getSuggestion() != null && !issue.getSuggestion().isEmpty()) {
-            Label suggestionLabel = new Label("💡 " + issue.getSuggestion());
-            suggestionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #059669; -fx-wrap-text: true;");
-            card.getChildren().add(suggestionLabel);
-        }
-
-        return card;
     }
 
     /**
@@ -715,5 +601,355 @@ public class AuditController {
 
     private void showErrorNotification() {
         showNotification("❌ Erreur", "Une erreur s'est produite. Veuillez réessayer.");
+    }
+
+    /**
+     * Afficher la boîte de dialogue des résultats
+     */
+    private void showAuditResultsDialog(AuditResponseDto audit) {
+        Dialog<Void> resultsDialog = new Dialog<>();
+        resultsDialog.setTitle("Analyse terminée");
+        resultsDialog.setHeaderText(null);
+
+        // FIX: Ajuster la taille de la fenêtre pour qu'elle tienne dans l'écran
+        resultsDialog.setResizable(true);
+        resultsDialog.getDialogPane().setMinSize(700, 600);
+        resultsDialog.getDialogPane().setPrefSize(800, 650);
+
+        ButtonType closeButton = new ButtonType("Fermer", ButtonBar.ButtonData.CANCEL_CLOSE);
+        resultsDialog.getDialogPane().getButtonTypes().add(closeButton);
+
+        VBox mainContent = new VBox(15);
+        mainContent.setPadding(new Insets(20));
+        mainContent.setStyle("-fx-background-color: #f9fafb;");
+
+        // ========== TITRE ==========
+        Label titleLabel = new Label("✅ Analyse terminée");
+        titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: 700; -fx-text-fill: #1f2937;");
+
+        // ========== RAPPORT DE CONFORMITÉ ==========
+        VBox reportBox = createReportSummaryBox(audit);
+
+        // ========== ONGLETS: PROBLÈMES ET RECOMMANDATIONS ==========
+        TabPane tabPane = new TabPane();
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        tabPane.setStyle("""
+        -fx-background-color: white;
+        -fx-border-radius: 12px;
+        -fx-background-radius: 12px;
+    """);
+
+        // 🔴 ONGLET 1: PROBLÈMES IDENTIFIÉS
+        Tab problemsTab = new Tab("🔴 Problèmes Identifiés");
+        problemsTab.setStyle("-fx-font-size: 14px; -fx-font-weight: 600;");
+
+        ScrollPane problemsScrollPane = new ScrollPane();
+        problemsScrollPane.setFitToWidth(true);
+        problemsScrollPane.setStyle("-fx-background-color: white;");
+        problemsScrollPane.setPrefHeight(300);
+
+        VBox problemsContainer = new VBox(12);
+        problemsContainer.setPadding(new Insets(15));
+
+        if (audit.getIssues() != null && !audit.getIssues().isEmpty()) {
+            log.info("📋 Affichage de {} problèmes", audit.getIssues().size());
+            for (var issue : audit.getIssues()) {
+                problemsContainer.getChildren().add(createProblemCard(issue));
+            }
+        } else {
+            Label noIssuesLabel = new Label("✅ Aucun problème critique détecté");
+            noIssuesLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #10b981; -fx-padding: 20;");
+            problemsContainer.getChildren().add(noIssuesLabel);
+        }
+
+        problemsScrollPane.setContent(problemsContainer);
+        problemsTab.setContent(problemsScrollPane);
+
+        // 💡 ONGLET 2: RECOMMANDATIONS
+        Tab recommendationsTab = new Tab("💡 Recommandations");
+        recommendationsTab.setStyle("-fx-font-size: 14px; -fx-font-weight: 600;");
+
+        ScrollPane recoScrollPane = new ScrollPane();
+        recoScrollPane.setFitToWidth(true);
+        recoScrollPane.setStyle("-fx-background-color: white;");
+        recoScrollPane.setPrefHeight(300);
+
+        VBox recoContainer = new VBox(12);
+        recoContainer.setPadding(new Insets(15));
+
+        // Générer des recommandations basées sur les problèmes
+        if (audit.getIssues() != null && !audit.getIssues().isEmpty()) {
+            for (var issue : audit.getIssues()) {
+                if (issue.getSuggestion() != null && !issue.getSuggestion().isEmpty()) {
+                    recoContainer.getChildren().add(createRecommendationCard(issue));
+                }
+            }
+        }
+
+        if (recoContainer.getChildren().isEmpty()) {
+            Label noRecoLabel = new Label("✅ Aucune recommandation spécifique");
+            noRecoLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #6b7280; -fx-padding: 20;");
+            recoContainer.getChildren().add(noRecoLabel);
+        }
+
+        recoScrollPane.setContent(recoContainer);
+        recommendationsTab.setContent(recoScrollPane);
+
+        tabPane.getTabs().addAll(problemsTab, recommendationsTab);
+
+        // ========== BOUTONS D'ACTION ==========
+        HBox actionButtons = new HBox(12);
+        actionButtons.setAlignment(Pos.CENTER);
+        actionButtons.setPadding(new Insets(10, 0, 0, 0));
+
+        // 📥 BOUTON TÉLÉCHARGER LE RAPPORT
+        Button downloadBtn = new Button("📥 Télécharger le Rapport");
+        downloadBtn.setStyle("""
+        -fx-background-color: #10b981;
+        -fx-text-fill: white;
+        -fx-font-weight: 600;
+        -fx-font-size: 14px;
+        -fx-padding: 12 24;
+        -fx-border-radius: 8;
+        -fx-background-radius: 8;
+        -fx-cursor: hand;
+    """);
+        downloadBtn.setOnMouseEntered(e -> downloadBtn.setStyle(downloadBtn.getStyle() + "-fx-effect: dropshadow(gaussian, rgba(16, 185, 129, 0.5), 10, 0, 0, 2);"));
+        downloadBtn.setOnMouseExited(e -> downloadBtn.setStyle(downloadBtn.getStyle().replace("-fx-effect: dropshadow(gaussian, rgba(16, 185, 129, 0.5), 10, 0, 0, 2);", "")));
+        downloadBtn.setOnAction(e -> handleDownloadReport(audit));
+
+        // 🔄 BOUTON NOUVEL AUDIT
+        Button newAuditBtn = new Button("🔄 Lancer un Nouvel Audit");
+        newAuditBtn.setStyle("""
+        -fx-background-color: #1E88E5;
+        -fx-text-fill: white;
+        -fx-font-weight: 600;
+        -fx-font-size: 14px;
+        -fx-padding: 12 24;
+        -fx-border-radius: 8;
+        -fx-background-radius: 8;
+        -fx-cursor: hand;
+    """);
+        newAuditBtn.setOnAction(e -> {
+            resultsDialog.close();
+            resetAuditForm();
+        });
+
+        actionButtons.getChildren().addAll(downloadBtn, newAuditBtn);
+
+        mainContent.getChildren().addAll(titleLabel, reportBox, tabPane, actionButtons);
+        resultsDialog.getDialogPane().setContent(mainContent);
+        resultsDialog.showAndWait();
+    }
+
+    /**
+     * Créer une carte pour un problème - AMÉLIORÉE
+     */
+    private VBox createProblemCard(AuditIssueDto issue) {
+        VBox card = new VBox(10);
+        card.setStyle("""
+        -fx-background-color: #fef2f2;
+        -fx-border-color: #fca5a5;
+        -fx-border-width: 1;
+        -fx-border-radius: 12;
+        -fx-background-radius: 12;
+        -fx-padding: 15;
+    """);
+
+        // Icône + Type
+        HBox header = new HBox(10);
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        Label icon = new Label("🔴");
+        icon.setStyle("-fx-font-size: 18px;");
+
+        Label typeLabel = new Label(issue.getIssueType() != null ? issue.getIssueType() : "Problème");
+        typeLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: 700; -fx-text-fill: #dc2626;");
+
+        header.getChildren().addAll(icon, typeLabel);
+
+        // Description
+        Label descLabel = new Label(issue.getDescription() != null ? issue.getDescription() : "Aucune description");
+        descLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #374151; -fx-wrap-text: true;");
+        descLabel.setWrapText(true);
+
+        card.getChildren().addAll(header, descLabel);
+
+        // Location
+        if (issue.getLocation() != null && !issue.getLocation().isEmpty()) {
+            Label locationLabel = new Label("📍 " + issue.getLocation());
+            locationLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #6b7280; -fx-font-style: italic;");
+            card.getChildren().add(locationLabel);
+        }
+
+        return card;
+    }
+
+    /**
+     * Créer une carte pour une recommandation
+     */
+    private VBox createRecommendationCard(AuditIssueDto issue) {
+        VBox card = new VBox(10);
+        card.setStyle("""
+        -fx-background-color: #f0fdf4;
+        -fx-border-color: #86efac;
+        -fx-border-width: 1;
+        -fx-border-radius: 12;
+        -fx-background-radius: 12;
+        -fx-padding: 15;
+    """);
+
+        // Icône + Titre
+        HBox header = new HBox(10);
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        Label icon = new Label("💡");
+        icon.setStyle("-fx-font-size: 18px;");
+
+        Label titleLabel = new Label("Recommandation: " +
+                (issue.getIssueType() != null ? issue.getIssueType() : ""));
+        titleLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: 700; -fx-text-fill: #059669;");
+
+        header.getChildren().addAll(icon, titleLabel);
+
+        // Suggestion
+        Label suggestionLabel = new Label(issue.getSuggestion());
+        suggestionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #065f46; -fx-wrap-text: true;");
+        suggestionLabel.setWrapText(true);
+
+        card.getChildren().addAll(header, suggestionLabel);
+
+        return card;
+    }
+
+    /**
+     * Gérer le téléchargement du rapport - MODIFIÉ pour Word/PDF
+     */
+    private void handleDownloadReport(AuditResponseDto audit) {
+        log.info("📥 Téléchargement du rapport pour l'audit {}", audit.getId());
+
+        // Créer une boîte de dialogue pour choisir le format
+        Alert formatDialog = new Alert(Alert.AlertType.CONFIRMATION);
+        formatDialog.setTitle("Format du Rapport");
+        formatDialog.setHeaderText("Choisissez le format du rapport");
+        formatDialog.setContentText("Quel format préférez-vous ?");
+
+        // MODIFICATION: Supprimer TXT/HTML, ajouter Word/PDF
+        ButtonType pdfButton = new ButtonType("📕 PDF (.pdf)");
+        ButtonType wordButton = new ButtonType("📝 Word (.docx)");
+        ButtonType cancelButton = new ButtonType("Annuler", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+        formatDialog.getButtonTypes().setAll(pdfButton, wordButton, cancelButton);
+
+        formatDialog.showAndWait().ifPresent(choice -> {
+            if (choice == pdfButton) {
+                downloadReportAs(audit, "pdf");
+            } else if (choice == wordButton) {
+                downloadReportAs(audit, "docx");
+            }
+        });
+    }
+
+    /**
+     * Télécharger le rapport dans le format spécifié
+     */
+    private void downloadReportAs(AuditResponseDto audit, String format) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Enregistrer le Rapport");
+
+        // MODIFICATION: Changer le nom par défaut selon le format
+        String defaultFileName = String.format("Rapport_Audit_%d.%s",
+                audit.getId(),
+                format.equals("pdf") ? "pdf" : "docx");
+        fileChooser.setInitialFileName(defaultFileName);
+
+        if ("pdf".equals(format)) {
+            fileChooser.getExtensionFilters().add(
+                    new FileChooser.ExtensionFilter("Fichier PDF", "*.pdf"));
+        } else {
+            fileChooser.getExtensionFilters().add(
+                    new FileChooser.ExtensionFilter("Document Word", "*.docx"));
+        }
+
+        File file = fileChooser.showSaveDialog(dropzone.getScene().getWindow());
+
+        if (file != null) {
+            // Afficher un dialogue de progression
+            Dialog<Void> progressDialog = new Dialog<>();
+            progressDialog.setTitle("Génération du rapport");
+            progressDialog.setHeaderText("Génération du rapport en cours...");
+
+            ProgressIndicator progressIndicator = new ProgressIndicator();
+            progressIndicator.setPrefSize(60, 60);
+
+            VBox progressContent = new VBox(20, progressIndicator,
+                    new Label("Veuillez patienter..."));
+            progressContent.setAlignment(Pos.CENTER);
+            progressContent.setPadding(new Insets(30));
+
+            progressDialog.getDialogPane().setContent(progressContent);
+            progressDialog.show();
+
+            Task<Void> exportTask = new Task<>() {
+                @Override
+                protected Void call() throws Exception {
+                    try {
+                        // MODIFICATION: Appeler les méthodes appropriées pour PDF/Word
+                        if ("pdf".equals(format)) {
+                            reportService.generateAndSavePdfReport(audit, file);
+                        } else {
+                            reportService.generateAndSaveWordReport(audit, file);
+                        }
+                        return null;
+                    } catch (Exception e) {
+                        log.error("❌ Erreur lors de la génération du rapport", e);
+                        throw e;
+                    }
+                }
+            };
+
+            exportTask.setOnSucceeded(e -> {
+                progressDialog.close();
+                showNotification("✅ Rapport enregistré",
+                        "Le rapport a été enregistré avec succès");
+                log.info("✅ Rapport {} enregistré: {}", format.toUpperCase(), file.getAbsolutePath());
+
+                // Proposer d'ouvrir le fichier - MODIFICATION: Gérer l'exception Headless
+                Alert openDialog = new Alert(Alert.AlertType.CONFIRMATION);
+                openDialog.setTitle("Rapport enregistré");
+                openDialog.setHeaderText("Le rapport a été enregistré avec succès !");
+                openDialog.setContentText("Voulez-vous ouvrir le fichier ?");
+
+                openDialog.showAndWait().ifPresent(response -> {
+                    if (response == ButtonType.OK) {
+                        try {
+                            // Vérifier si Desktop est supporté
+                            if (java.awt.Desktop.isDesktopSupported()) {
+                                java.awt.Desktop.getDesktop().open(file);
+                            } else {
+                                log.warn("Desktop n'est pas supporté");
+                                showNotification("ℹ️ Info",
+                                        "Le fichier a été enregistré mais ne peut pas être ouvert automatiquement.");
+                            }
+                        } catch (Exception ex) {
+                            log.error("Impossible d'ouvrir le fichier", ex);
+                            showNotification("⚠️ Attention",
+                                    "Le fichier a été enregistré mais n'a pas pu être ouvert automatiquement.");
+                        }
+                    }
+                });
+            });
+
+            exportTask.setOnFailed(e -> {
+                progressDialog.close();
+                Throwable exception = exportTask.getException();
+                log.error("❌ Erreur lors de l'enregistrement du rapport", exception);
+                showNotification("❌ Erreur",
+                        "Impossible d'enregistrer le rapport: " +
+                                (exception.getMessage() != null ? exception.getMessage() : "Erreur inconnue"));
+            });
+
+            new Thread(exportTask).start();
+        }
     }
 }

@@ -53,6 +53,7 @@ public class AuditIssueService {
     /**
      * Récupérer un problème par son ID
      */
+    @Transactional(readOnly = true)
     public AuditIssueDto getIssueById(Long issueId) {
         AuditIssue issue = issueRepository.findById(issueId.intValue())
                 .orElseThrow(() -> new RuntimeException("Problème introuvable avec l'ID: " + issueId));
@@ -60,30 +61,38 @@ public class AuditIssueService {
     }
 
     /**
-     * Récupérer tous les problèmes d'un audit
+     * 🔥 FIX: Récupérer tous les problèmes d'un audit avec @Transactional
      */
+    @Transactional(readOnly = true)
     public List<AuditIssueDto> getIssuesByAudit(Long auditId) {
+        log.info("📊 Récupération des issues pour l'audit ID: {}", auditId);
+
         // Récupérer l'audit complet depuis la base
         Audit audit = auditRepository.findById(auditId)
                 .orElseThrow(() -> new RuntimeException("Audit introuvable avec l'ID: " + auditId));
 
         List<AuditIssue> issues = issueRepository.findByAudit(audit);
-        return issues.stream()
-                .map(this::mapToDto)
+
+        // 🔥 IMPORTANT: Mapper dans la transaction pour éviter LazyInitializationException
+        List<AuditIssueDto> issueDtos = issues.stream()
+                .map(this::mapToDtoSafe) // Utiliser mapToDtoSafe au lieu de mapToDto
                 .collect(Collectors.toList());
+
+        log.info("✅ {} issues récupérées et mappées avec succès", issueDtos.size());
+        return issueDtos;
     }
 
     /**
      * Récupérer tous les problèmes d'un audit avec pagination
      */
+    @Transactional(readOnly = true)
     public Page<AuditIssueDto> getIssuesByAudit(Long auditId, Pageable pageable) {
-        // Récupérer l'audit complet depuis la base
         Audit audit = auditRepository.findById(auditId)
                 .orElseThrow(() -> new RuntimeException("Audit introuvable avec l'ID: " + auditId));
 
         List<AuditIssue> allIssues = issueRepository.findByAudit(audit);
         List<AuditIssueDto> issueDtos = allIssues.stream()
-                .map(this::mapToDto)
+                .map(this::mapToDtoSafe)
                 .collect(Collectors.toList());
 
         int start = (int) pageable.getOffset();
@@ -95,22 +104,23 @@ public class AuditIssueService {
     /**
      * Récupérer tous les problèmes d'un document
      */
+    @Transactional(readOnly = true)
     public List<AuditIssueDto> getIssuesByDocument(Long documentId) {
         AuditDocument document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new RuntimeException("Document introuvable"));
 
         List<AuditIssue> issues = issueRepository.findByDocument(document);
         return issues.stream()
-                .map(this::mapToDto)
+                .map(this::mapToDtoSafe)
                 .collect(Collectors.toList());
     }
 
     /**
      * Filtrer les problèmes selon plusieurs critères
      */
+    @Transactional(readOnly = true)
     public List<AuditIssueDto> filterIssues(Long auditId, String issueType,
                                             String severity, String category, Boolean resolved) {
-        // Récupérer l'audit complet depuis la base
         Audit audit = auditRepository.findById(auditId)
                 .orElseThrow(() -> new RuntimeException("Audit introuvable avec l'ID: " + auditId));
 
@@ -125,7 +135,7 @@ public class AuditIssueService {
                     }
                     return true;
                 })
-                .map(this::mapToDto)
+                .map(this::mapToDtoSafe)
                 .collect(Collectors.toList());
     }
 
@@ -140,9 +150,8 @@ public class AuditIssueService {
                 .orElseThrow(() -> new RuntimeException("Problème introuvable avec l'ID: " + issueId));
 
         issue.setStatus("Resolved");
-
         issue = issueRepository.save(issue);
-        return mapToDto(issue);
+        return mapToDtoSafe(issue);
     }
 
     /**
@@ -156,9 +165,8 @@ public class AuditIssueService {
                 .orElseThrow(() -> new RuntimeException("Problème introuvable avec l'ID: " + issueId));
 
         issue.setStatus("Open");
-
         issue = issueRepository.save(issue);
-        return mapToDto(issue);
+        return mapToDtoSafe(issue);
     }
 
     /**
@@ -188,6 +196,7 @@ public class AuditIssueService {
     /**
      * Compter le nombre de problèmes d'un audit
      */
+    @Transactional(readOnly = true)
     public int countByAudit(Audit audit) {
         return issueRepository.findByAudit(audit).size();
     }
@@ -195,8 +204,8 @@ public class AuditIssueService {
     /**
      * Obtenir les statistiques des problèmes d'un audit
      */
+    @Transactional(readOnly = true)
     public Map<String, Object> getIssueStatistics(Long auditId) {
-        // Récupérer l'audit complet depuis la base
         Audit audit = auditRepository.findById(auditId)
                 .orElseThrow(() -> new RuntimeException("Audit introuvable avec l'ID: " + auditId));
 
@@ -219,8 +228,8 @@ public class AuditIssueService {
     /**
      * Obtenir le nombre de problèmes par catégorie
      */
+    @Transactional(readOnly = true)
     public Map<String, Integer> getIssuesByCategory(Long auditId) {
-        // Récupérer l'audit complet depuis la base
         Audit audit = auditRepository.findById(auditId)
                 .orElseThrow(() -> new RuntimeException("Audit introuvable avec l'ID: " + auditId));
 
@@ -236,8 +245,8 @@ public class AuditIssueService {
     /**
      * Obtenir le nombre de problèmes par sévérité
      */
+    @Transactional(readOnly = true)
     public Map<String, Integer> getIssuesBySeverity(Long auditId) {
-        // Récupérer l'audit complet depuis la base
         Audit audit = auditRepository.findById(auditId)
                 .orElseThrow(() -> new RuntimeException("Audit introuvable avec l'ID: " + auditId));
 
@@ -253,15 +262,26 @@ public class AuditIssueService {
     }
 
     /**
-     * Mapper une entité AuditIssue vers AuditIssueDto
+     * 🔥 NOUVELLE MÉTHODE: Mapper de façon sécurisée (évite LazyInitializationException)
+     * Cette méthode accède aux propriétés lazy DANS la transaction
      */
-    private AuditIssueDto mapToDto(AuditIssue issue) {
+    private AuditIssueDto mapToDtoSafe(AuditIssue issue) {
         String documentName = null;
         Long documentId = null;
 
+        // 🔥 FIX: Accéder aux propriétés DANS la transaction
         if (issue.getDocument() != null) {
-            documentName = issue.getDocument().getDocumentName();
-            documentId = issue.getDocument().getId();
+            try {
+                // Forcer le chargement du document
+                AuditDocument doc = issue.getDocument();
+                documentName = doc.getDocumentName();
+                documentId = doc.getId();
+            } catch (Exception e) {
+                log.warn("⚠️ Impossible d'accéder au document pour l'issue {}: {}",
+                        issue.getId(), e.getMessage());
+                documentName = "Document inconnu";
+                documentId = null;
+            }
         }
 
         // Déterminer la localisation
@@ -282,12 +302,20 @@ public class AuditIssueService {
                 .documentId(documentId)
                 .documentName(documentName)
                 .issueType(issue.getIssueType())
-                .title(issue.getIssueType()) // Utiliser issueType comme titre si pas de champ title
+                .title(issue.getIssueType())
                 .description(issue.getDescription())
                 .location(location)
                 .suggestion(issue.getSuggestion())
                 .resolved(isResolved)
                 .detectedAt(issue.getReportedAt())
                 .build();
+    }
+
+    /**
+     * Ancienne méthode mapToDto (gardée pour compatibilité mais déconseillée)
+     */
+    @Deprecated
+    private AuditIssueDto mapToDto(AuditIssue issue) {
+        return mapToDtoSafe(issue);
     }
 }
