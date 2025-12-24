@@ -854,102 +854,72 @@ public class AuditController {
      * Télécharger le rapport dans le format spécifié
      */
     private void downloadReportAs(AuditResponseDto audit, String format) {
+
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Enregistrer le Rapport");
 
-        // MODIFICATION: Changer le nom par défaut selon le format
-        String defaultFileName = String.format("Rapport_Audit_%d.%s",
-                audit.getId(),
-                format.equals("pdf") ? "pdf" : "docx");
-        fileChooser.setInitialFileName(defaultFileName);
+        String fileName = "Rapport_Audit_" + audit.getId() +
+                ("pdf".equals(format) ? ".pdf" : ".docx");
+        fileChooser.setInitialFileName(fileName);
 
         if ("pdf".equals(format)) {
             fileChooser.getExtensionFilters().add(
-                    new FileChooser.ExtensionFilter("Fichier PDF", "*.pdf"));
+                    new FileChooser.ExtensionFilter("PDF (*.pdf)", "*.pdf"));
         } else {
             fileChooser.getExtensionFilters().add(
-                    new FileChooser.ExtensionFilter("Document Word", "*.docx"));
+                    new FileChooser.ExtensionFilter("Word (*.docx)", "*.docx"));
         }
 
         File file = fileChooser.showSaveDialog(dropzone.getScene().getWindow());
+        if (file == null) return;
 
-        if (file != null) {
-            // Afficher un dialogue de progression
-            Dialog<Void> progressDialog = new Dialog<>();
-            progressDialog.setTitle("Génération du rapport");
-            progressDialog.setHeaderText("Génération du rapport en cours...");
+        // 🔹 Génération EN ARRIÈRE-PLAN (sans UI)
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                if ("pdf".equals(format)) {
+                    reportService.generateAndSavePdfReport(audit, file);
+                } else {
+                    reportService.generateAndSaveWordReport(audit, file);
+                }
+                return null;
+            }
+        };
 
-            ProgressIndicator progressIndicator = new ProgressIndicator();
-            progressIndicator.setPrefSize(60, 60);
+        task.setOnSucceeded(e -> {
+            Alert success = new Alert(Alert.AlertType.CONFIRMATION);
+            success.setTitle("Rapport généré");
+            success.setHeaderText("Le rapport a été généré avec succès !");
+            success.setContentText("Voulez-vous ouvrir le fichier ?");
 
-            VBox progressContent = new VBox(20, progressIndicator,
-                    new Label("Veuillez patienter..."));
-            progressContent.setAlignment(Pos.CENTER);
-            progressContent.setPadding(new Insets(30));
-
-            progressDialog.getDialogPane().setContent(progressContent);
-            progressDialog.show();
-
-            Task<Void> exportTask = new Task<>() {
-                @Override
-                protected Void call() throws Exception {
+            success.showAndWait().ifPresent(response -> {
+                if (response == ButtonType.OK) {
                     try {
-                        // MODIFICATION: Appeler les méthodes appropriées pour PDF/Word
-                        if ("pdf".equals(format)) {
-                            reportService.generateAndSavePdfReport(audit, file);
-                        } else {
-                            reportService.generateAndSaveWordReport(audit, file);
+                        if (java.awt.Desktop.isDesktopSupported()) {
+                            java.awt.Desktop.getDesktop().open(file);
                         }
-                        return null;
-                    } catch (Exception e) {
-                        log.error("❌ Erreur lors de la génération du rapport", e);
-                        throw e;
+                    } catch (Exception ex) {
+                        log.error("Impossible d'ouvrir le fichier", ex);
                     }
                 }
-            };
-
-            exportTask.setOnSucceeded(e -> {
-                progressDialog.close();
-                showNotification("✅ Rapport enregistré",
-                        "Le rapport a été enregistré avec succès");
-                log.info("✅ Rapport {} enregistré: {}", format.toUpperCase(), file.getAbsolutePath());
-
-                // Proposer d'ouvrir le fichier - MODIFICATION: Gérer l'exception Headless
-                Alert openDialog = new Alert(Alert.AlertType.CONFIRMATION);
-                openDialog.setTitle("Rapport enregistré");
-                openDialog.setHeaderText("Le rapport a été enregistré avec succès !");
-                openDialog.setContentText("Voulez-vous ouvrir le fichier ?");
-
-                openDialog.showAndWait().ifPresent(response -> {
-                    if (response == ButtonType.OK) {
-                        try {
-                            // Vérifier si Desktop est supporté
-                            if (java.awt.Desktop.isDesktopSupported()) {
-                                java.awt.Desktop.getDesktop().open(file);
-                            } else {
-                                log.warn("Desktop n'est pas supporté");
-                                showNotification("ℹ️ Info",
-                                        "Le fichier a été enregistré mais ne peut pas être ouvert automatiquement.");
-                            }
-                        } catch (Exception ex) {
-                            log.error("Impossible d'ouvrir le fichier", ex);
-                            showNotification("⚠️ Attention",
-                                    "Le fichier a été enregistré mais n'a pas pu être ouvert automatiquement.");
-                        }
-                    }
-                });
             });
+        });
 
-            exportTask.setOnFailed(e -> {
-                progressDialog.close();
-                Throwable exception = exportTask.getException();
-                log.error("❌ Erreur lors de l'enregistrement du rapport", exception);
-                showNotification("❌ Erreur",
-                        "Impossible d'enregistrer le rapport: " +
-                                (exception.getMessage() != null ? exception.getMessage() : "Erreur inconnue"));
-            });
+        task.setOnFailed(e -> {
+            Throwable ex = task.getException();
+            log.error("Erreur génération rapport", ex);
 
-            new Thread(exportTask).start();
-        }
+            Alert error = new Alert(Alert.AlertType.ERROR);
+            error.setTitle("Erreur");
+            error.setHeaderText("Erreur lors de la génération du rapport");
+            error.setContentText(ex.getMessage());
+            error.show();
+        });
+
+        Thread thread = new Thread(task);
+        thread.setDaemon(true);
+        thread.start();
     }
+
+
 }
