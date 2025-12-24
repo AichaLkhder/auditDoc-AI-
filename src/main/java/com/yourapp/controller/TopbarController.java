@@ -3,27 +3,32 @@ package com.yourapp.controller;
 import com.yourapp.model.Notification;
 import com.yourapp.model.User;
 import com.yourapp.services.NotificationService;
-import com.yourapp.service.UserClient;
-
-import com.yourapp.services.UserService;
+import com.yourapp.utils.SessionManager;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Circle;
+import javafx.stage.Stage;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
+
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
+
 @Component
 public class TopbarController {
 
     @FXML private ImageView topLogo;
     @FXML private Label topAppName;
-
     @FXML private Label userName;
     @FXML private Label userRole;
     @FXML private Circle notificationBadge;
@@ -31,17 +36,20 @@ public class TopbarController {
     @FXML private StackPane notificationWrapper;
     @FXML private Button btnNewAudit;
     @FXML private Circle avatarCircle;
+    @FXML private Label avatarText;
     @FXML private Button btnLanguage;
     @FXML private Button btnTheme;
 
     private final NotificationService notificationService = new NotificationService();
 
+    @Autowired
+    private ApplicationContext springContext;
 
     private MainLayoutController mainController;
 
     @FXML
     public void initialize() {
-        // Charger logo avec taille ajustée
+        // Load logo
         try {
             Image img = new Image(getClass().getResource("/views/icons/logo-audit.png").toExternalForm());
             if (topLogo != null) {
@@ -52,18 +60,33 @@ public class TopbarController {
                 topLogo.setSmooth(true);
             }
         } catch (Exception ex) {
-            System.err.println("TopbarController: logo introuvable -> " + ex.getMessage());
+            System.err.println("TopbarController: logo not found -> " + ex.getMessage());
         }
 
-        // Charger utilisateur
-        User u = UserService.getCurrentUser();
-        if (u != null) {
-            userName.setText(u.getFullName());
-            userRole.setText(u.getRole());
-        }
+        // Load current user from session
+        loadCurrentUser();
 
         // Notifications
         updateNotificationBadge();
+
+        // Fix button rendering - ensure no ellipsis
+        Platform.runLater(() -> {
+            if (btnNotifications != null) {
+                btnNotifications.setMnemonicParsing(false);
+                btnNotifications.setEllipsisString("");
+            }
+            if (btnLanguage != null) {
+                btnLanguage.setMnemonicParsing(false);
+                btnLanguage.setEllipsisString("");
+            }
+            if (btnTheme != null) {
+                btnTheme.setMnemonicParsing(false);
+                btnTheme.setEllipsisString("");
+            }
+            if (btnNewAudit != null) {
+                btnNewAudit.setMnemonicParsing(false);
+            }
+        });
 
         // Actions
         btnNotifications.setOnAction(e -> showNotificationPopup());
@@ -71,16 +94,62 @@ public class TopbarController {
         btnLanguage.setOnAction(e -> showLanguageMenu());
         btnTheme.setOnAction(e -> toggleTheme());
 
-        // Menu utilisateur - clickable sur tout le HBox
+        // User menu - clickable on all elements
         userName.setOnMouseClicked(e -> showUserMenu());
         userRole.setOnMouseClicked(e -> showUserMenu());
         avatarCircle.setOnMouseClicked(e -> showUserMenu());
 
-        // Logo et nom de l'app - clickable pour retourner au dashboard
+        // Logo and app name - clickable to return to dashboard
         topLogo.setOnMouseClicked(e -> loadDashboard());
         topAppName.setOnMouseClicked(e -> loadDashboard());
         topLogo.setStyle("-fx-cursor: hand;");
         topAppName.setStyle("-fx-cursor: hand;");
+    }
+
+    /**
+     * Load the current logged-in user from SessionManager
+     */
+    private void loadCurrentUser() {
+        User currentUser = SessionManager.getInstance().getCurrentUser();
+
+        if (currentUser != null) {
+            userName.setText(currentUser.getFullName());
+            userRole.setText(currentUser.getRole());
+
+            // Set avatar color based on user role
+            updateAvatarColor(currentUser.getRole());
+
+            System.out.println("✅ Topbar loaded for user: " + currentUser.getFullName());
+        } else {
+            userName.setText("Guest");
+            userRole.setText("Not logged in");
+            avatarCircle.setFill(javafx.scene.paint.Color.GRAY);
+            System.err.println("⚠️ No user logged in - SessionManager returned null");
+        }
+    }
+
+    /**
+     * Update avatar color based on user role
+     */
+    private void updateAvatarColor(String role) {
+        if (role == null) {
+            avatarCircle.setFill(javafx.scene.paint.Color.GRAY);
+            return;
+        }
+
+        switch (role.toUpperCase()) {
+            case "ADMIN":
+            case "ADMINISTRATEUR":
+                avatarCircle.setFill(javafx.scene.paint.Color.web("#dc3545"));
+                break;
+            case "MANAGER":
+                avatarCircle.setFill(javafx.scene.paint.Color.web("#ffc107"));
+                break;
+            case "USER":
+            default:
+                avatarCircle.setFill(javafx.scene.paint.Color.web("#007bff"));
+                break;
+        }
     }
 
     public void setMainController(MainLayoutController mainController) {
@@ -152,12 +221,12 @@ public class TopbarController {
 
     private void changeLanguage(String lang) {
         System.out.println("Changement de langue: " + lang);
-        // Ajouter logique de changement de langue
+        // TODO: Add language change logic
     }
 
     private void toggleTheme() {
         System.out.println("Toggle theme (light/dark)");
-        // Ajouter logique de changement de thème
+        // TODO: Add theme change logic
         if (btnTheme.getText().equals("☀")) {
             btnTheme.setText("🌙");
         } else {
@@ -174,18 +243,58 @@ public class TopbarController {
 
         profile.setOnAction(e -> loadInCenter("/fxml/ProfileView.fxml"));
         help.setOnAction(e -> loadInCenter("/fxml/HelpView.fxml"));
-        logout.setOnAction(e -> {
-            System.out.println("Logout clicked");
-            // Ajouter logique de session / navigation vers login
-        });
+        logout.setOnAction(e -> handleLogout());
 
         menu.getItems().addAll(profile, help, logout);
         menu.show(userName, javafx.geometry.Side.BOTTOM, 0, 10);
     }
 
-    // ===============================
-    //   CHARGE FXML DANS BorderPane
-    // ===============================
+    /**
+     * Handle user logout
+     */
+    private void handleLogout() {
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("Confirmation");
+        confirmAlert.setHeaderText("Déconnexion");
+        confirmAlert.setContentText("Êtes-vous sûr de vouloir vous déconnecter?");
+
+        Optional<ButtonType> result = confirmAlert.showAndWait();
+
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            SessionManager.getInstance().logout();
+            System.out.println("✅ User logged out successfully");
+            redirectToLogin();
+        }
+    }
+
+    /**
+     * Redirect to login page
+     */
+    private void redirectToLogin() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/views/fxml/login.fxml"));
+            loader.setControllerFactory(springContext::getBean);
+            Parent root = loader.load();
+
+            Stage stage = (Stage) userName.getScene().getWindow();
+            stage.getScene().setRoot(root);
+            stage.setMaximized(true);
+            stage.setTitle("AuditDoc AI - Connexion");
+
+            System.out.println("✅ Redirected to login page");
+
+        } catch (Exception e) {
+            System.err.println("❌ Error redirecting to login: " + e.getMessage());
+            e.printStackTrace();
+
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Erreur");
+            alert.setHeaderText("Erreur de déconnexion");
+            alert.setContentText("Impossible de charger la page de connexion.");
+            alert.showAndWait();
+        }
+    }
+
     private void loadInCenter(String path) {
         try {
             Node loaded = loadFXML(path);
@@ -200,14 +309,13 @@ public class TopbarController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource(resourcePath));
             return loader.load();
         } catch (IOException | NullPointerException e) {
-            System.err.println("Erreur chargement: " + resourcePath);
+            System.err.println("Error loading: " + resourcePath);
             e.printStackTrace();
             return null;
         }
     }
 
     private void setCenterOfBorderPane(Node node) {
-        // Remonte depuis un noeud connu (btnNewAudit) jusqu'au BorderPane racine
         Node current = btnNewAudit;
         while (current != null) {
             if (current instanceof BorderPane) {
@@ -217,7 +325,6 @@ public class TopbarController {
             current = current.getParent();
         }
 
-        // Fallback: essayer la racine de la scène
         try {
             Node root = btnNewAudit.getScene().getRoot();
             if (root instanceof BorderPane) {
