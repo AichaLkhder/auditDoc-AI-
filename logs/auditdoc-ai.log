@@ -7954,3 +7954,148 @@ java.lang.RuntimeException: Erreur API Gemini: 429
 2025-12-24T16:39:32.935+01:00  INFO 20832 --- [JavaFX Application Thread] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
 2025-12-24T16:39:32.939+01:00  INFO 20832 --- [JavaFX Application Thread] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
 2025-12-24T16:39:32.941+01:00  INFO 20832 --- [JavaFX Application Thread] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2025-12-24T17:02:11.667+01:00  INFO 26592 --- [JavaFX-Launcher] o.s.boot.SpringApplication               : Starting application using Java 21.0.9 with PID 26592 (started by AdMin in C:\Users\AdMin\Desktop\auditDoc-AI-)
+2025-12-24T17:02:11.672+01:00  INFO 26592 --- [JavaFX-Launcher] o.s.boot.SpringApplication               : No active profile set, falling back to 1 default profile: "default"
+2025-12-24T17:02:12.736+01:00  INFO 26592 --- [JavaFX-Launcher] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-12-24T17:02:12.858+01:00  INFO 26592 --- [JavaFX-Launcher] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 111 ms. Found 8 JPA repository interfaces.
+2025-12-24T17:02:13.770+01:00  INFO 26592 --- [JavaFX-Launcher] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2025-12-24T17:02:13.858+01:00  INFO 26592 --- [JavaFX-Launcher] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.5.3.Final
+2025-12-24T17:02:13.905+01:00  INFO 26592 --- [JavaFX-Launcher] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2025-12-24T17:02:14.385+01:00  INFO 26592 --- [JavaFX-Launcher] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2025-12-24T17:02:14.425+01:00  INFO 26592 --- [JavaFX-Launcher] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-12-24T17:02:15.675+01:00  INFO 26592 --- [JavaFX-Launcher] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@1d57f084
+2025-12-24T17:02:15.677+01:00  INFO 26592 --- [JavaFX-Launcher] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-12-24T17:02:17.826+01:00  INFO 26592 --- [JavaFX-Launcher] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2025-12-24T17:02:17.947+01:00  INFO 26592 --- [JavaFX-Launcher] org.hibernate.orm.connections.access     : HHH10001501: Connection obtained from JdbcConnectionAccess [org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator$ConnectionProviderJdbcConnectionAccess@506e1236] for (non-JTA) DDL execution was not in auto-commit mode; the Connection 'local transaction' will be committed and the Connection will be set into auto-commit mode.
+2025-12-24T17:02:18.473+01:00  INFO 26592 --- [JavaFX-Launcher] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2025-12-24T17:02:19.191+01:00  INFO 26592 --- [JavaFX-Launcher] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2025-12-24T17:02:20.250+01:00  INFO 26592 --- [JavaFX-Launcher] o.s.boot.SpringApplication               : Started application in 9.722 seconds (process running for 10.601)
+2025-12-24T17:03:09.586+01:00  INFO 26592 --- [JavaFX Application Thread] c.y.controller.DashboardController       : 🚀 Initialisation du Dashboard
+2025-12-24T17:03:09.590+01:00  INFO 26592 --- [Thread-5] com.yourapp.services.DashboardService    : Récupération des stats dashboard pour user 6
+2025-12-24T17:03:09.590+01:00  INFO 26592 --- [JavaFX Application Thread] c.y.controller.DashboardController       : ✅ Dashboard initialisé avec succès
+2025-12-24T17:03:10.206+01:00  INFO 26592 --- [Thread-5] com.yourapp.services.DashboardService    : Récupération de la progression des projets
+2025-12-24T17:03:10.408+01:00  INFO 26592 --- [Thread-5] com.yourapp.services.DashboardService    : Récupération des activités récentes
+2025-12-24T17:03:10.848+01:00 ERROR 26592 --- [Thread-5] c.y.controller.DashboardController       : ❌ Erreur lors du chargement des données
+
+org.hibernate.LazyInitializationException: could not initialize proxy [com.yourapp.model.Audit#64] - no Session
+	at org.hibernate.proxy.AbstractLazyInitializer.initialize(AbstractLazyInitializer.java:165) ~[hibernate-core-6.5.3.Final.jar:6.5.3.Final]
+	at org.hibernate.proxy.AbstractLazyInitializer.getImplementation(AbstractLazyInitializer.java:314) ~[hibernate-core-6.5.3.Final.jar:6.5.3.Final]
+	at org.hibernate.proxy.pojo.bytebuddy.ByteBuddyInterceptor.intercept(ByteBuddyInterceptor.java:44) ~[hibernate-core-6.5.3.Final.jar:6.5.3.Final]
+	at org.hibernate.proxy.ProxyConfiguration$InterceptorDispatcher.intercept(ProxyConfiguration.java:102) ~[hibernate-core-6.5.3.Final.jar:6.5.3.Final]
+	at com.yourapp.model.Audit$HibernateProxy$VGziE6kP.getProjectName(Unknown Source) ~[classes/:na]
+	at com.yourapp.services.DashboardService.getRecentActivities(DashboardService.java:146) ~[classes/:na]
+	at com.yourapp.controller.DashboardController$1.call(DashboardController.java:85) ~[classes/:na]
+	at com.yourapp.controller.DashboardController$1.call(DashboardController.java:73) ~[classes/:na]
+	at javafx.graphics@21.0.4/javafx.concurrent.Task$TaskCallable.call(Task.java:1399) ~[javafx-graphics-21.0.4-win.jar:na]
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1583) ~[na:na]
+
+2025-12-24T17:03:14.744+01:00  INFO 26592 --- [JavaFX Application Thread] com.yourapp.controller.AuditController   : 🚀 Initialisation du AuditController
+2025-12-24T17:03:14.748+01:00  INFO 26592 --- [JavaFX Application Thread] com.yourapp.controller.AuditController   : 📥 Chargement des projets...
+2025-12-24T17:03:14.749+01:00  INFO 26592 --- [JavaFX Application Thread] com.yourapp.controller.AuditController   : ✅ AuditController initialisé avec succès
+2025-12-24T17:03:14.749+01:00  INFO 26592 --- [Thread-6] c.yourapp.services_UI.ProjectApiService  : 📥 Récupération de tous les projets
+2025-12-24T17:03:15.066+01:00  INFO 26592 --- [Thread-6] c.yourapp.services_UI.ProjectApiService  : ✅ 6 projets récupérés avec succès
+2025-12-24T17:03:15.067+01:00  INFO 26592 --- [JavaFX Application Thread] com.yourapp.controller.AuditController   : ✅ 6 projets chargés
+2025-12-24T17:03:20.481+01:00  INFO 26592 --- [JavaFX Application Thread] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2025-12-24T17:03:20.484+01:00  INFO 26592 --- [JavaFX Application Thread] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-12-24T17:03:20.584+01:00  INFO 26592 --- [JavaFX Application Thread] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2025-12-24T17:03:30.483+01:00  INFO 26856 --- [JavaFX-Launcher] o.s.boot.SpringApplication               : Starting application using Java 21.0.9 with PID 26856 (started by AdMin in C:\Users\AdMin\Desktop\auditDoc-AI-)
+2025-12-24T17:03:30.486+01:00  INFO 26856 --- [JavaFX-Launcher] o.s.boot.SpringApplication               : No active profile set, falling back to 1 default profile: "default"
+2025-12-24T17:03:31.214+01:00  INFO 26856 --- [JavaFX-Launcher] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-12-24T17:03:31.309+01:00  INFO 26856 --- [JavaFX-Launcher] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 86 ms. Found 8 JPA repository interfaces.
+2025-12-24T17:03:32.001+01:00  INFO 26856 --- [JavaFX-Launcher] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2025-12-24T17:03:32.065+01:00  INFO 26856 --- [JavaFX-Launcher] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.5.3.Final
+2025-12-24T17:03:32.097+01:00  INFO 26856 --- [JavaFX-Launcher] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2025-12-24T17:03:32.483+01:00  INFO 26856 --- [JavaFX-Launcher] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2025-12-24T17:03:32.517+01:00  INFO 26856 --- [JavaFX-Launcher] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-12-24T17:03:33.686+01:00  INFO 26856 --- [JavaFX-Launcher] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@1d57f084
+2025-12-24T17:03:33.688+01:00  INFO 26856 --- [JavaFX-Launcher] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-12-24T17:03:35.404+01:00  INFO 26856 --- [JavaFX-Launcher] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2025-12-24T17:03:35.507+01:00  INFO 26856 --- [JavaFX-Launcher] org.hibernate.orm.connections.access     : HHH10001501: Connection obtained from JdbcConnectionAccess [org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator$ConnectionProviderJdbcConnectionAccess@506e1236] for (non-JTA) DDL execution was not in auto-commit mode; the Connection 'local transaction' will be committed and the Connection will be set into auto-commit mode.
+2025-12-24T17:03:35.926+01:00  INFO 26856 --- [JavaFX-Launcher] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2025-12-24T17:03:36.642+01:00  INFO 26856 --- [JavaFX-Launcher] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2025-12-24T17:03:37.593+01:00  INFO 26856 --- [JavaFX-Launcher] o.s.boot.SpringApplication               : Started application in 7.768 seconds (process running for 8.696)
+2025-12-24T17:03:38.097+01:00  INFO 31916 --- [JavaFX Application Thread] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2025-12-24T17:03:38.102+01:00  INFO 31916 --- [JavaFX Application Thread] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-12-24T17:03:38.287+01:00  INFO 31916 --- [JavaFX Application Thread] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2025-12-24T17:05:31.287+01:00  INFO 26856 --- [JavaFX Application Thread] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2025-12-24T17:05:31.295+01:00  INFO 26856 --- [JavaFX Application Thread] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-12-24T17:05:31.535+01:00  INFO 26856 --- [JavaFX Application Thread] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2025-12-24T17:05:39.224+01:00  INFO 3268 --- [JavaFX-Launcher] o.s.boot.SpringApplication               : Starting application using Java 21.0.9 with PID 3268 (started by AdMin in C:\Users\AdMin\Desktop\auditDoc-AI-)
+2025-12-24T17:05:39.227+01:00  INFO 3268 --- [JavaFX-Launcher] o.s.boot.SpringApplication               : No active profile set, falling back to 1 default profile: "default"
+2025-12-24T17:05:40.167+01:00  INFO 3268 --- [JavaFX-Launcher] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-12-24T17:05:40.285+01:00  INFO 3268 --- [JavaFX-Launcher] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 107 ms. Found 8 JPA repository interfaces.
+2025-12-24T17:05:41.192+01:00  INFO 3268 --- [JavaFX-Launcher] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2025-12-24T17:05:41.294+01:00  INFO 3268 --- [JavaFX-Launcher] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.5.3.Final
+2025-12-24T17:05:41.353+01:00  INFO 3268 --- [JavaFX-Launcher] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2025-12-24T17:05:41.836+01:00  INFO 3268 --- [JavaFX-Launcher] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2025-12-24T17:05:41.875+01:00  INFO 3268 --- [JavaFX-Launcher] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-12-24T17:05:43.037+01:00  INFO 3268 --- [JavaFX-Launcher] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@130311f4
+2025-12-24T17:05:43.038+01:00  INFO 3268 --- [JavaFX-Launcher] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-12-24T17:05:44.806+01:00  INFO 3268 --- [JavaFX-Launcher] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2025-12-24T17:05:44.919+01:00  INFO 3268 --- [JavaFX-Launcher] org.hibernate.orm.connections.access     : HHH10001501: Connection obtained from JdbcConnectionAccess [org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator$ConnectionProviderJdbcConnectionAccess@7155f2e3] for (non-JTA) DDL execution was not in auto-commit mode; the Connection 'local transaction' will be committed and the Connection will be set into auto-commit mode.
+2025-12-24T17:05:45.337+01:00  INFO 3268 --- [JavaFX-Launcher] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2025-12-24T17:05:46.052+01:00  INFO 3268 --- [JavaFX-Launcher] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2025-12-24T17:05:47.098+01:00  INFO 3268 --- [JavaFX-Launcher] o.s.boot.SpringApplication               : Started application in 8.738 seconds (process running for 9.924)
+2025-12-24T17:06:44.283+01:00  INFO 3268 --- [JavaFX Application Thread] c.y.controller.DashboardController       : 🚀 Initialisation du Dashboard
+2025-12-24T17:06:44.288+01:00  INFO 3268 --- [Thread-5] com.yourapp.services.DashboardService    : Récupération des stats dashboard pour user 6
+2025-12-24T17:06:44.288+01:00  INFO 3268 --- [JavaFX Application Thread] c.y.controller.DashboardController       : ✅ Dashboard initialisé avec succès
+2025-12-24T17:06:44.878+01:00  INFO 3268 --- [Thread-5] com.yourapp.services.DashboardService    : Récupération de la progression des projets
+2025-12-24T17:06:45.069+01:00  INFO 3268 --- [Thread-5] com.yourapp.services.DashboardService    : Récupération des activités récentes
+2025-12-24T17:06:45.468+01:00 ERROR 3268 --- [Thread-5] c.y.controller.DashboardController       : ❌ Erreur lors du chargement des données
+
+org.hibernate.LazyInitializationException: could not initialize proxy [com.yourapp.model.Audit#64] - no Session
+	at org.hibernate.proxy.AbstractLazyInitializer.initialize(AbstractLazyInitializer.java:165) ~[hibernate-core-6.5.3.Final.jar:6.5.3.Final]
+	at org.hibernate.proxy.AbstractLazyInitializer.getImplementation(AbstractLazyInitializer.java:314) ~[hibernate-core-6.5.3.Final.jar:6.5.3.Final]
+	at org.hibernate.proxy.pojo.bytebuddy.ByteBuddyInterceptor.intercept(ByteBuddyInterceptor.java:44) ~[hibernate-core-6.5.3.Final.jar:6.5.3.Final]
+	at org.hibernate.proxy.ProxyConfiguration$InterceptorDispatcher.intercept(ProxyConfiguration.java:102) ~[hibernate-core-6.5.3.Final.jar:6.5.3.Final]
+	at com.yourapp.model.Audit$HibernateProxy$k2OhmQ2w.getProjectName(Unknown Source) ~[classes/:na]
+	at com.yourapp.services.DashboardService.getRecentActivities(DashboardService.java:146) ~[classes/:na]
+	at com.yourapp.controller.DashboardController$1.call(DashboardController.java:85) ~[classes/:na]
+	at com.yourapp.controller.DashboardController$1.call(DashboardController.java:73) ~[classes/:na]
+	at javafx.graphics@21.0.4/javafx.concurrent.Task$TaskCallable.call(Task.java:1399) ~[javafx-graphics-21.0.4-win.jar:na]
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1583) ~[na:na]
+
+2025-12-24T17:06:48.314+01:00  INFO 3268 --- [JavaFX Application Thread] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2025-12-24T17:06:48.318+01:00  INFO 3268 --- [JavaFX Application Thread] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-12-24T17:06:48.409+01:00  INFO 3268 --- [JavaFX Application Thread] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2025-12-24T17:06:59.260+01:00  INFO 6308 --- [JavaFX-Launcher] o.s.boot.SpringApplication               : Starting application using Java 21.0.9 with PID 6308 (started by AdMin in C:\Users\AdMin\Desktop\auditDoc-AI-)
+2025-12-24T17:06:59.263+01:00  INFO 6308 --- [JavaFX-Launcher] o.s.boot.SpringApplication               : No active profile set, falling back to 1 default profile: "default"
+2025-12-24T17:06:59.955+01:00  INFO 6308 --- [JavaFX-Launcher] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-12-24T17:07:00.053+01:00  INFO 6308 --- [JavaFX-Launcher] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 90 ms. Found 8 JPA repository interfaces.
+2025-12-24T17:07:00.787+01:00  INFO 6308 --- [JavaFX-Launcher] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2025-12-24T17:07:00.859+01:00  INFO 6308 --- [JavaFX-Launcher] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.5.3.Final
+2025-12-24T17:07:00.899+01:00  INFO 6308 --- [JavaFX-Launcher] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2025-12-24T17:07:01.280+01:00  INFO 6308 --- [JavaFX-Launcher] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2025-12-24T17:07:01.311+01:00  INFO 6308 --- [JavaFX-Launcher] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-12-24T17:07:02.558+01:00  INFO 6308 --- [JavaFX-Launcher] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@1668b605
+2025-12-24T17:07:02.559+01:00  INFO 6308 --- [JavaFX-Launcher] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-12-24T17:07:04.272+01:00  INFO 6308 --- [JavaFX-Launcher] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2025-12-24T17:07:04.387+01:00  INFO 6308 --- [JavaFX-Launcher] org.hibernate.orm.connections.access     : HHH10001501: Connection obtained from JdbcConnectionAccess [org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator$ConnectionProviderJdbcConnectionAccess@6949cbe8] for (non-JTA) DDL execution was not in auto-commit mode; the Connection 'local transaction' will be committed and the Connection will be set into auto-commit mode.
+2025-12-24T17:07:04.805+01:00  INFO 6308 --- [JavaFX-Launcher] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2025-12-24T17:07:05.503+01:00  INFO 6308 --- [JavaFX-Launcher] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2025-12-24T17:07:06.409+01:00  INFO 6308 --- [JavaFX-Launcher] o.s.boot.SpringApplication               : Started application in 7.806 seconds (process running for 8.762)
+2025-12-24T17:07:55.028+01:00  INFO 6308 --- [JavaFX Application Thread] c.y.controller.DashboardController       : 🚀 Initialisation du Dashboard
+2025-12-24T17:07:55.030+01:00  INFO 6308 --- [Thread-6] com.yourapp.services.DashboardService    : Récupération des stats dashboard pour user 7
+2025-12-24T17:07:55.031+01:00  INFO 6308 --- [JavaFX Application Thread] c.y.controller.DashboardController       : ✅ Dashboard initialisé avec succès
+2025-12-24T17:07:55.628+01:00  INFO 6308 --- [Thread-6] com.yourapp.services.DashboardService    : Récupération de la progression des projets
+2025-12-24T17:07:55.832+01:00  INFO 6308 --- [Thread-6] com.yourapp.services.DashboardService    : Récupération des activités récentes
+2025-12-24T17:07:56.248+01:00 ERROR 6308 --- [Thread-6] c.y.controller.DashboardController       : ❌ Erreur lors du chargement des données
+
+org.hibernate.LazyInitializationException: could not initialize proxy [com.yourapp.model.Audit#64] - no Session
+	at org.hibernate.proxy.AbstractLazyInitializer.initialize(AbstractLazyInitializer.java:165) ~[hibernate-core-6.5.3.Final.jar:6.5.3.Final]
+	at org.hibernate.proxy.AbstractLazyInitializer.getImplementation(AbstractLazyInitializer.java:314) ~[hibernate-core-6.5.3.Final.jar:6.5.3.Final]
+	at org.hibernate.proxy.pojo.bytebuddy.ByteBuddyInterceptor.intercept(ByteBuddyInterceptor.java:44) ~[hibernate-core-6.5.3.Final.jar:6.5.3.Final]
+	at org.hibernate.proxy.ProxyConfiguration$InterceptorDispatcher.intercept(ProxyConfiguration.java:102) ~[hibernate-core-6.5.3.Final.jar:6.5.3.Final]
+	at com.yourapp.model.Audit$HibernateProxy$fn6m8bMK.getProjectName(Unknown Source) ~[classes/:na]
+	at com.yourapp.services.DashboardService.getRecentActivities(DashboardService.java:146) ~[classes/:na]
+	at com.yourapp.controller.DashboardController$1.call(DashboardController.java:85) ~[classes/:na]
+	at com.yourapp.controller.DashboardController$1.call(DashboardController.java:73) ~[classes/:na]
+	at javafx.graphics@21.0.4/javafx.concurrent.Task$TaskCallable.call(Task.java:1399) ~[javafx-graphics-21.0.4-win.jar:na]
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1583) ~[na:na]
+
+2025-12-24T17:07:58.868+01:00  INFO 6308 --- [JavaFX Application Thread] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2025-12-24T17:07:58.872+01:00  INFO 6308 --- [JavaFX Application Thread] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-12-24T17:07:59.148+01:00  INFO 6308 --- [JavaFX Application Thread] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
