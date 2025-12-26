@@ -7,7 +7,6 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.Scene; // Non utilisé pour la redirection, mais laissé pour la complétude de l'import
 import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.TextField;
@@ -16,6 +15,8 @@ import javafx.stage.Stage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
+
+import java.io.IOException;
 
 @Component
 public class PswdForgotController {
@@ -26,7 +27,6 @@ public class PswdForgotController {
     @FXML private Hyperlink creerCompteLink;
     @FXML private Button retourConnexionButton;
 
-    // 🔐 NEW: Inject authentication service
     @Autowired
     private AuthenticationService authenticationService;
 
@@ -61,25 +61,42 @@ public class PswdForgotController {
             return;
         }
 
-        // 🔐 NEW: Call authentication service
         sendCodeButton.setDisable(true);
         sendCodeButton.setText("Envoi en cours...");
 
-        // Run password reset request in background thread
         new Thread(() -> {
             try {
                 PasswordResetRequestDto request = new PasswordResetRequestDto(email);
                 AuthResponseDto response = authenticationService.requestPasswordReset(request);
 
-                // Update UI on JavaFX thread
                 Platform.runLater(() -> {
                     sendCodeButton.setDisable(false);
                     sendCodeButton.setText("Envoyer le code de connexion");
 
-                    // Always show success for security (don't reveal if email exists)
+                    // Show success message
                     showAlert(Alert.AlertType.INFORMATION, "Email envoyé", response.getMessage());
 
                     System.out.println("✅ Password reset email sent to: " + email);
+
+                    // 🔄 NEW: Redirect to Reset Password Screen after success
+                    try {
+                        FXMLLoader loader = new FXMLLoader(
+                                getClass().getResource("/views/fxml/reset_password.fxml")
+                        );
+                        loader.setControllerFactory(springContext::getBean);
+                        Parent root = loader.load();
+
+                        Stage stage = (Stage) sendCodeButton.getScene().getWindow();
+                        stage.getScene().setRoot(root);
+                        stage.setTitle("Audit Doc AI - Réinitialisation du mot de passe");
+                        stage.setMaximized(true);
+
+                        System.out.println("Redirection vers la page de réinitialisation...");
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        showAlert(Alert.AlertType.ERROR, "Erreur",
+                                "Impossible de charger la page de réinitialisation.");
+                    }
                 });
 
             } catch (Exception e) {
@@ -111,12 +128,9 @@ public class PswdForgotController {
             Parent root = loader.load();
 
             Stage stage = (Stage) creerCompteLink.getScene().getWindow();
-
-            // **MODIFICATION CLÉ : Utiliser setRoot pour conserver l'état maximisé**
             stage.getScene().setRoot(root);
             stage.setTitle("Audit Doc AI - Créer un Compte");
-            stage.setMaximized(true); // Maintenir l'état maximisé
-            // stage.show() n'est pas nécessaire si setRoot est utilisé
+            stage.setMaximized(true);
 
             System.out.println("Redirection vers la page de création de compte (maximisée)...");
         } catch (Exception e) {
@@ -136,12 +150,9 @@ public class PswdForgotController {
             Parent root = loader.load();
 
             Stage stage = (Stage) retourConnexionButton.getScene().getWindow();
-
-            // **MODIFICATION CLÉ : Utiliser setRoot pour conserver l'état maximisé**
             stage.getScene().setRoot(root);
             stage.setTitle("Audit Doc AI - Connexion");
-            stage.setMaximized(true); // Maintenir l'état maximisé
-            // stage.show() n'est pas nécessaire si setRoot est utilisé
+            stage.setMaximized(true);
 
             System.out.println("Retour à la page de connexion (maximisée)...");
         } catch (Exception e) {
