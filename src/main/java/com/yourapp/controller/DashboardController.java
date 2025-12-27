@@ -11,12 +11,15 @@ import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Objects;
 
 @Component
 @Slf4j
@@ -34,6 +37,7 @@ public class DashboardController {
     @FXML private VBox recentAuditsContainer;
     @FXML private VBox projectProgressContainer;
     @FXML private VBox complianceCard;
+    @FXML private ImageView complianceStatusIcon;
     @FXML private VBox chatMessagesContainer;
     @FXML private TextField chatInputField;
     @FXML private Button chatSendButton;
@@ -183,6 +187,14 @@ public class DashboardController {
         }
 
         complianceCard.setStyle(baseStyle + colorStyle);
+
+        String iconFile = score < 50 ? "close.png" : "check-mark.png";
+        if (complianceStatusIcon != null) {
+            String iconPath = Objects.requireNonNull(
+                    getClass().getResource("/views/icons/" + iconFile)
+            ).toExternalForm();
+            complianceStatusIcon.setImage(new Image(iconPath));
+        }
     }
 
     /**

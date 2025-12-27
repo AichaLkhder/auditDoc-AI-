@@ -57,7 +57,7 @@ public class DashboardService {
         int projectsThisWeek = calculateProjectsThisWeek(allProjects);
         int auditsConforme = calculateConformeAudits(allAudits);
         int auditsNonConforme = calculateNonConformeAudits(allAudits);
-        int globalScore = calculateGlobalScore(allAudits);
+        int globalScore = calculateGlobalScore(totalAudits, auditsConforme);
         String complianceStatus = getComplianceStatus(globalScore, totalAudits);
 
         long duration = System.currentTimeMillis() - startTime;
@@ -174,28 +174,19 @@ public class DashboardService {
     }
 
     /**
-     * ✅ CORRIGÉ: Calculer le score global avec gestion du cas 0 audit
+     * Calculer le score global avec gestion du cas 0 audit
      */
-    private int calculateGlobalScore(List<Audit> audits) {
-        List<Audit> completedAudits = audits.stream()
-                .filter(a -> "COMPLETED".equals(a.getStatus()))
-                .filter(a -> a.getScore() != null && a.getScore() > 0)
-                .collect(Collectors.toList());
-
-        if (completedAudits.isEmpty()) {
-            // ✅ Si aucun audit complété, retourner 0 au lieu de calculer
+    private int calculateGlobalScore(int totalAudits, int auditsConforme) {
+        if (totalAudits == 0) {
             return 0;
         }
 
-        int totalScore = completedAudits.stream()
-                .mapToInt(Audit::getScore)
-                .sum();
-
-        return totalScore / completedAudits.size();
+        double ratio = ((double) auditsConforme / totalAudits) * 100;
+        return (int) Math.round(ratio);
     }
 
     /**
-     * ✅ CORRIGÉ: Message adapté quand aucun audit n'existe
+     * Message adapté quand aucun audit n'existe
      */
     private String getComplianceStatus(int score, int totalAudits) {
         // Si aucun audit, message spécifique
@@ -203,9 +194,9 @@ public class DashboardService {
             return "Aucun audit disponible. Créez votre premier audit ! 🚀";
         }
 
-        // Si des audits existent mais aucun complété
+        // Si des audits existent mais aucun n'est conforme
         if (score == 0) {
-            return "En attente d'audits complétés pour calculer le score";
+            return "Aucun audit conforme pour l'instant";
         }
 
         // Sinon, message basé sur le score
